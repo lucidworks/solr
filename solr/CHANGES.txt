@@ -8,6 +8,8 @@ https://github.com/apache/solr/blob/main/solr/solr-ref-guide/modules/upgrade-not
 
 * FUS-2043: Switch docker image to use eclipse-temurin:11-jre as base image  (see SOLR-16463)
 
+* SOLR-16214: Fix refGuide usage of lunr (backport to solve build problems) 
+
 ==================  9.0.0 ==================
 
 New Features
