@@ -17,15 +17,55 @@
 
 package org.apache.solr.util.external;
 
+import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.common.cloud.DocCollection;
+import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.util.Hash;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 public class ExternalFileUtil {
 
   private static int HASH_SEED = 12131344;
 
-  public int hashCode(byte[] bytes, int start, int length) {
-    return Hash.murmurhash3_x86_32(bytes, start, length, HASH_SEED);
+  public static void main(String[] args) throws Exception{
+
+    String inRoot = args[0];
+    String outRoot = args[1];
+    List<String> zkHosts = new ArrayList<>();
+    String mainCollection = args[2];
+
+    CloudSolrClient solrClient = new CloudSolrClient.Builder(zkHosts).build();
+
+    try {
+      Iterator<ExternalFile> iterator = iterate(inRoot);
+      while (iterator.hasNext()) {
+        ExternalFile externalFile = iterator.next();
+        process(externalFile, outRoot, solrClient, mainCollection);
+      }
+    } finally {
+      solrClient.close();
+    }
   }
 
+  public static int hashCode(byte[] bytes, int offset, int length) {
+    return Hash.murmurhash3_x86_32(bytes, offset, length, HASH_SEED);
+  }
+
+  public static Iterator<ExternalFile> iterate(String root) {
+    return null;
+  }
+
+  public static void process(ExternalFile externalFile, String outRoot, CloudSolrClient cloudSolrClient, String mainCollection) {
+    DocCollection docCollection = cloudSolrClient.getClusterState().getCollection(mainCollection);
+    DocRouter docRouter = docCollection.getRouter();
+
+
+  }
+
+  public static String getShard() {
+    return null;
+  }
 }
