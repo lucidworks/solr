@@ -17,10 +17,15 @@
 
 package org.apache.solr.util.external;
 
+import org.apache.solr.common.util.Hash;
+
+
 public class ExternalFileUtil {
 
-  public int hashCode(byte[] bytes) {
-    return 1;
+  private static int HASH_SEED = 12131344;
+
+  public int hashCode(byte[] bytes, int start, int length) {
+    return Hash.murmurhash3_x86_32(bytes, start, length, HASH_SEED);
   }
 
 }
