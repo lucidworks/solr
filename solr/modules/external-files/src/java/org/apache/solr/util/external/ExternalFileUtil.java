@@ -32,7 +32,7 @@ public class ExternalFileUtil {
   private static final int HASH_DIRS = 250;
   private static final String SHARD_TEMP_FILE = "temp.bin";
   private static final int NUM_PARTITIONS = 11;
-
+  private static final int SORT_PARTITION_SIZE = 50000;
 
   public static void main(String[] args) throws Exception{
 
@@ -105,9 +105,72 @@ public class ExternalFileUtil {
         dataOutputStream.close();
       }
     }
-    partitionShards(shardHomes);
 
+    partitionShards(shardHomes);
+    sortPartitions(shardHomes);
   }
+
+  public static void sortPartitions(List<File> shardHomes) throws IOException {
+    for(File shardHome : shardHomes) {
+      for(int i=0; i<NUM_PARTITIONS; i++) {
+        sortPartition(shardHome, i);
+      }
+    }
+  }
+
+  public static void sortPartition(File shardHome, int partitionNumber) throws IOException {
+    DataInputStream partitionIn = null;
+    List<Record> records = new ArrayList<>(SORT_PARTITION_SIZE);
+    ByteComp byteComp = new ByteComp();
+    try {
+      partitionIn = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(shardHome, SHARD_TEMP_FILE + "." + partitionNumber))));
+      while(true) {
+        for (int i = 0; i < SORT_PARTITION_SIZE; i++) {
+          Record record = new Record();
+          record.read(partitionIn);
+          records.add(record);
+        }
+        Collections.sort(records, byteComp);
+        
+
+      }
+
+    } finally {
+
+    }
+  }
+
+  public static class Record  {
+    byte[] bytes;
+    int length;
+    float f;
+
+    public void read(DataInputStream dataInputStream) throws IOException {
+      length = dataInputStream.read();
+      bytes = new byte[length];
+      dataInputStream.read(bytes, 0, length);
+      f = dataInputStream.readFloat();
+    }
+  }
+
+  public static class ByteComp implements Comparator<Record> {
+
+    public int compare(Record rec1, Record rec2) {
+      return compare(rec1.bytes, rec1.length, rec2.bytes, rec2.length);
+    }
+
+    int compare(byte[] left, int length1, byte[] right, int length2) {
+      for (int i = 0, j = 0; i < length1 && j < length2; i++, j++) {
+        byte a = left[i];
+        byte b = right[j];
+        if (a != b) {
+          return a - b;
+        }
+      }
+      return length1 - length2;
+    }
+  }
+
 
   public static void partitionShards(List<File> shardHomes) throws IOException {
     //Process the shard files
