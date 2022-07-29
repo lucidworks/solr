@@ -118,26 +118,57 @@ public class ExternalFileUtil {
     }
   }
 
-  public static void sortPartition(File shardHome, int partitionNumber) throws IOException {
+  public static List<File> sortPartition(File shardHome, int partitionNumber) throws IOException {
     DataInputStream partitionIn = null;
     List<Record> records = new ArrayList<>(SORT_PARTITION_SIZE);
     ByteComp byteComp = new ByteComp();
     try {
       partitionIn = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(shardHome, SHARD_TEMP_FILE + "." + partitionNumber))));
-      while(true) {
+      int segment = 0;
+      LinkedList<File> segments = new LinkedList<>();
+      boolean finished = false;
+      while(!finished) {
         for (int i = 0; i < SORT_PARTITION_SIZE; i++) {
-          Record record = new Record();
-          record.read(partitionIn);
-          records.add(record);
+          try {
+            Record record = new Record();
+            record.read(partitionIn);
+            records.add(record);
+          } catch (EOFException E) {
+            finished = true;
+          }
         }
         Collections.sort(records, byteComp);
-        
-
+        File segmentFile = new File(shardHome, SHARD_TEMP_FILE+"."+partitionIn+"."+segment);
+        segments.addLast(segmentFile);
+        writeSortedSegment(segmentFile, records);
+        records.clear();
+        ++segment;
       }
-
+      mergeSegments(segments);
+      return segments;
     } finally {
 
     }
+  }
+
+  public static void writeSortedSegment(File segmentFile, List<Record>records) {
+
+  }
+
+  public static void mergeSegments(LinkedList<File> segments) {
+    // Merge is a circular motion until there is only one segment.
+    while(segments.size() > 1) {
+      File file1 = segments.removeFirst();
+      File file2 = segments.removeFirst();
+      File file3 = merge(file1, file2);
+      segments.addLast(file3);
+      file1.delete();
+      file2.delete();
+    }
+  }
+
+  public static File merge(File file1, File file2) {
+    return null;
   }
 
   public static class Record  {
