@@ -18,6 +18,7 @@
 package org.apache.solr.util.external;
 
 import java.io.File;
+import java.util.Iterator;
 
 public class ExternalFile {
   long timeStamp;
@@ -30,6 +31,36 @@ public class ExternalFile {
     this.timeStamp = timeStamp;
     this.type = type;
     this.customer = customer;
+  }
+
+  public static Iterator<ExternalFile> iterate(String root) {
+    return new ExternalFileIterator(root);
+  }
+
+  public static class ExternalFileIterator implements Iterator<ExternalFile> {
+
+    String[] customers = null;
+    int customerIndex = 0;
+
+
+    public ExternalFileIterator(String root) {
+        File customersRoot = new File(root);
+        customers = customersRoot.list();
+    }
+
+    public boolean hasNext() {
+      if(customerIndex == 0) {
+        return true;
+      }
+
+      return false;
+    }
+
+    public ExternalFile next() {
+      ++customerIndex;
+      File file = new File("/Users/joelbernstein/tools/merge/test/customer1/pricing/1659368012/customer1.txt");
+      return new ExternalFile(file, "customer1", 121213131, "pricing");
+    }
   }
 
 }

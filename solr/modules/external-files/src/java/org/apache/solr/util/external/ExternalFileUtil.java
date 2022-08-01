@@ -17,6 +17,7 @@
 
 package org.apache.solr.util.external;
 
+import org.apache.solr.client.solrj.impl.CloudLegacySolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocRouter;
@@ -33,6 +34,7 @@ public class ExternalFileUtil {
   private static final String SHARD_TEMP_FILE = "temp.bin";
   private static final String FINAL_PARTITION_PREFIX = "partition_";
   private static final String MERGE_FILE_PREFIX = "merge_";
+  private static final String SHARD_COMPLETE_FILE = "shard_complete";
   private static final int NUM_PARTITIONS = 11;
   private static final int SORT_PARTITION_SIZE = 50000;
 
@@ -41,11 +43,13 @@ public class ExternalFileUtil {
     String inRoot = args[0];
     String outRoot = args[1];
     List<String> zkHosts = new ArrayList<>();
+    zkHosts.add("localhost:9983");
     String mainCollection = args[2];
 
-    CloudSolrClient solrClient = new CloudSolrClient.Builder(zkHosts).build();
+    CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
 
     try {
+      solrClient.connect();
       Iterator<ExternalFile> iterator = iterate(inRoot);
       while (iterator.hasNext()) {
         ExternalFile externalFile = iterator.next();
@@ -61,7 +65,7 @@ public class ExternalFileUtil {
   }
 
   public static Iterator<ExternalFile> iterate(String root) {
-    return null;
+    return ExternalFile.iterate(root);
   }
 
   public static void process(ExternalFile externalFile, String outRoot, CloudSolrClient cloudSolrClient, String mainCollection) throws IOException {
@@ -119,7 +123,7 @@ public class ExternalFileUtil {
         sortPartition(shardHome, i);
       }
       // Write the partition file
-      new File(shardHome, "shard_data_complete").createNewFile();
+      new File(shardHome, SHARD_COMPLETE_FILE).createNewFile();
     }
   }
 
@@ -127,10 +131,17 @@ public class ExternalFileUtil {
     DataInputStream partitionIn = null;
     List<Record> records = new ArrayList<>(SORT_PARTITION_SIZE);
     ByteComp byteComp = new ByteComp();
+    File partitionFile = new File(shardHome, SHARD_TEMP_FILE + "." + partitionNumber);
+
     try {
-      partitionIn = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(shardHome, SHARD_TEMP_FILE + "." + partitionNumber))));
-      int segment = 0;
       LinkedList<File> segments = new LinkedList<>();
+
+      if(!partitionFile.exists()) {
+        return segments;
+      }
+
+      partitionIn = new DataInputStream(new BufferedInputStream(new FileInputStream(partitionFile)));
+      int segment = 0;
       boolean finished = false;
       while(!finished) {
         for (int i = 0; i < SORT_PARTITION_SIZE; i++) {
@@ -140,6 +151,7 @@ public class ExternalFileUtil {
             records.add(record);
           } catch (EOFException E) {
             finished = true;
+            break;
           }
         }
 
@@ -156,7 +168,7 @@ public class ExternalFileUtil {
       finalSegment.renameTo(new File(finalSegment.getParentFile(), FINAL_PARTITION_PREFIX+partitionNumber));
       return segments;
     } finally {
-
+      partitionFile.delete();
     }
   }
 
@@ -321,13 +333,13 @@ public class ExternalFileUtil {
     return mergeFile;
   }
 
-  public static class Record  {
+  public static class Record {
     byte[] bytes;
-    int length;
+    byte length;
     float f;
 
     public void read(DataInputStream dataInputStream) throws IOException {
-      length = dataInputStream.read();
+      length = dataInputStream.readByte();
       bytes = new byte[length];
       dataInputStream.read(bytes, 0, length);
       f = dataInputStream.readFloat();
@@ -370,7 +382,7 @@ public class ExternalFileUtil {
           tempStream.read(bytes, 0, b);
           float f = tempStream.readFloat();
           int hash = Hash.murmurhash3_x86_32(bytes, 0, b, HASH_SEED);
-          int bucket = hash % partitions.length;
+          int bucket = Math.abs(hash % partitions.length);
           if(partitions[bucket] == null) {
             partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(shardHome, SHARD_TEMP_FILE+"."+bucket))));
           }
@@ -384,7 +396,9 @@ public class ExternalFileUtil {
       } finally {
         tempStream.close();
         for(DataOutputStream dataOutputStream : partitions) {
-          dataOutputStream.close();
+          if(dataOutputStream != null) {
+            dataOutputStream.close();
+          }
         }
         tempFile.delete();
       }
