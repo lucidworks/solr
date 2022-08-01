@@ -42,9 +42,10 @@ public class ExternalFileUtil {
 
     String inRoot = args[0];
     String outRoot = args[1];
+    String zkHost = args[2];
     List<String> zkHosts = new ArrayList<>();
-    zkHosts.add("localhost:9983");
-    String mainCollection = args[2];
+    zkHosts.add(zkHost);
+    String mainCollection = args[3];
 
     CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
 
@@ -70,7 +71,11 @@ public class ExternalFileUtil {
 
   public static void process(ExternalFile externalFile, String outRoot, CloudSolrClient cloudSolrClient, String mainCollection) throws IOException {
 
-    if(oldData(externalFile, outRoot)) {
+    System.out.println("Processing External File:"+externalFile.file);
+
+    if(!refresh(externalFile, outRoot)) {
+      System.out.println("Old Data External File:"+externalFile.file);
+
       return;
     }
 
@@ -114,7 +119,6 @@ public class ExternalFileUtil {
 
     partitionShards(shardHomes);
     sortPartitions(shardHomes);
-
   }
 
   public static void sortPartitions(List<File> shardHomes) throws IOException {
@@ -405,22 +409,23 @@ public class ExternalFileUtil {
     }
   }
 
-  public static boolean oldData(ExternalFile externalFile, String outRoot) {
+  public static boolean refresh(ExternalFile externalFile, String outRoot) {
     File cdir = getCustomerOutDir(outRoot, externalFile);
+    System.out.println("Customer outdir:"+cdir);
 
     if(!cdir.exists()) {
       cdir.mkdirs();
-      return false;
+      return true;
     }
 
     String[] dirs = cdir.list();
     for(String dir : dirs) {
       long ldir = Long.parseLong(dir);
       if(externalFile.timeStamp > ldir) {
-        return false;
+        return true;
       }
     }
-    return true;
+    return false;
   }
 
   public static String getHashDir(String customer) {
