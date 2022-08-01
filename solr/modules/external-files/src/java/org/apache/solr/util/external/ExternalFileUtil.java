@@ -31,6 +31,7 @@ public class ExternalFileUtil {
   private static final int HASH_SEED = 12131344;
   private static final int HASH_DIRS = 250;
   private static final String SHARD_TEMP_FILE = "temp.bin";
+  private static final String FINAL_PARTITION_PREFIX = "partition_";
   private static final String MERGE_FILE_PREFIX = "merge_";
   private static final int NUM_PARTITIONS = 11;
   private static final int SORT_PARTITION_SIZE = 50000;
@@ -109,6 +110,7 @@ public class ExternalFileUtil {
 
     partitionShards(shardHomes);
     sortPartitions(shardHomes);
+
   }
 
   public static void sortPartitions(List<File> shardHomes) throws IOException {
@@ -116,6 +118,8 @@ public class ExternalFileUtil {
       for(int i=0; i<NUM_PARTITIONS; i++) {
         sortPartition(shardHome, i);
       }
+      // Write the partition file
+      new File(shardHome, "shard_data_complete").createNewFile();
     }
   }
 
@@ -138,14 +142,18 @@ public class ExternalFileUtil {
             finished = true;
           }
         }
-        Collections.sort(records, byteComp);
-        File segmentFile = new File(shardHome, SHARD_TEMP_FILE+"."+partitionIn+"."+segment);
-        segments.addLast(segmentFile);
-        writeSortedSegment(segmentFile, records);
-        records.clear();
-        ++segment;
+
+        if(records.size() > 0) {
+          Collections.sort(records, byteComp);
+          File segmentFile = new File(shardHome, SHARD_TEMP_FILE + "." + partitionIn + "." + segment);
+          segments.addLast(segmentFile);
+          writeSortedSegment(segmentFile, records);
+          records.clear();
+          ++segment;
+        }
       }
-      mergeSegments(segments);
+      File finalSegment = mergeSegments(segments);
+      finalSegment.renameTo(new File(finalSegment.getParentFile(), FINAL_PARTITION_PREFIX+partitionNumber));
       return segments;
     } finally {
 
@@ -168,7 +176,7 @@ public class ExternalFileUtil {
     }
   }
 
-  public static void mergeSegments(LinkedList<File> segments) throws IOException {
+  public static File mergeSegments(LinkedList<File> segments) throws IOException {
     // Merge is a circular motion until there is only one segment.
     int mergeCount = 0;
     while(segments.size() > 1) {
@@ -182,7 +190,7 @@ public class ExternalFileUtil {
     }
 
     File finalSegment = segments.removeLast();
-    finalSegment.renameTo(null);
+    return finalSegment;
   }
 
   public static File merge(File file1, File file2, int mergeCount) throws IOException {
@@ -423,7 +431,4 @@ public class ExternalFileUtil {
     return file;
   }
 
-  public static String getShard() {
-    return null;
-  }
 }
