@@ -31,6 +31,7 @@ public class ExternalFileUtil {
   private static final int HASH_SEED = 12131344;
   private static final int HASH_DIRS = 250;
   private static final String SHARD_TEMP_FILE = "temp.bin";
+  private static final String MERGE_FILE_PREFIX = "merge_";
   private static final int NUM_PARTITIONS = 11;
   private static final int SORT_PARTITION_SIZE = 50000;
 
@@ -151,24 +152,165 @@ public class ExternalFileUtil {
     }
   }
 
-  public static void writeSortedSegment(File segmentFile, List<Record>records) {
+  public static void writeSortedSegment(File segmentFile, List<Record>records) throws IOException {
 
+    DataOutputStream outSegment = null;
+
+    try {
+      outSegment = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(segmentFile)));
+      for(Record record : records) {
+        outSegment.writeByte(record.length);
+        outSegment.write(record.bytes, 0, record.length);
+        outSegment.writeFloat(record.f);
+      }
+    } finally {
+      outSegment.close();
+    }
   }
 
-  public static void mergeSegments(LinkedList<File> segments) {
+  public static void mergeSegments(LinkedList<File> segments) throws IOException {
     // Merge is a circular motion until there is only one segment.
+    int mergeCount = 0;
     while(segments.size() > 1) {
+      ++mergeCount;
       File file1 = segments.removeFirst();
       File file2 = segments.removeFirst();
-      File file3 = merge(file1, file2);
+      File file3 = merge(file1, file2, mergeCount);
       segments.addLast(file3);
       file1.delete();
       file2.delete();
     }
+
+    File finalSegment = segments.removeLast();
+    finalSegment.renameTo(null);
   }
 
-  public static File merge(File file1, File file2) {
-    return null;
+  public static File merge(File file1, File file2, int mergeCount) throws IOException {
+    byte[] file1Bytes = new byte[127];
+    byte[] file2Bytes = new byte[127];
+
+    DataInputStream file1In = null;
+    DataInputStream file2In = null;
+    DataOutputStream mergeOut = null;
+    File mergeFile = new File(file1.getParentFile(), MERGE_FILE_PREFIX+Integer.toString(mergeCount));
+
+    try {
+      mergeOut = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(mergeFile)));
+      file1In = new DataInputStream(new BufferedInputStream(new FileInputStream(file1), 50000));
+      file2In = new DataInputStream(new BufferedInputStream(new FileInputStream(file2), 50000));
+      byte length1 = file1In.readByte();
+      file1In.read(file1Bytes, 0, length1);
+      float f1 = file1In.readFloat();
+
+      byte length2 = file2In.readByte();
+      float f2 = file2In.readFloat();
+      file2In.read(file2Bytes, 0, length2);
+
+      boolean file1Done = false;
+      boolean file2Done = false;
+
+      while (!file1Done && !file2Done) {
+        int value = compare(file1Bytes, length1, file1Bytes, length2);
+        if (value == 0) {
+
+          // We are equal write both
+          // In the case of unique ID's this should not happen
+          mergeOut.writeByte(length1);
+          mergeOut.write(file1Bytes, 0, length1);
+          mergeOut.writeFloat(f1);
+
+          mergeOut.writeByte(length2);
+          mergeOut.write(file2Bytes, 0, length2);
+          mergeOut.writeFloat(f2);
+
+          //Advance left
+          try {
+            length1 = file1In.readByte();
+            file1In.read(file1Bytes, 0, length1);
+            f1 = file1In.readFloat();
+          } catch (EOFException eof) {
+            file1Done = true;
+          }
+          //Advance right
+          try {
+            length2 = file2In.readByte();
+            file2In.read(file2Bytes, 0, length2);
+            f2 = file2In.readFloat();
+          } catch (EOFException eof) {
+            file2Done = true;
+          }
+
+        } else if (value < 1) {
+          // Write and advance file1
+          mergeOut.writeByte(length1);
+          mergeOut.write(file1Bytes, 0, length1);
+          mergeOut.writeFloat(f1);
+
+          try {
+            length1 = file1In.readByte();
+            file1In.read(file1Bytes, 0, length1);
+            f1 = file1In.readFloat();
+          } catch (EOFException eof) {
+            file1Done = true;
+          }
+        } else {
+          // Write and advance file2
+          mergeOut.writeByte(length2);
+          mergeOut.write(file2Bytes, 0, length2);
+          mergeOut.writeFloat(f2);
+          try {
+            length2 = file2In.readByte();
+            file2In.read(file2Bytes, 0, length1);
+            f2 = file2In.readFloat();
+          } catch (EOFException eof) {
+            file2Done = true;
+          }
+        }
+      }
+
+      //One of the files is done write out the other file
+      if(!file1Done) {
+        while (true) {
+
+          mergeOut.writeByte(length1);
+          mergeOut.write(file1Bytes, 0, length1);
+          mergeOut.writeFloat(f1);
+
+          try {
+
+            length1 = file1In.readByte();
+            file1In.read(file1Bytes, 0, length1);
+            f1 = file1In.readFloat();
+
+          } catch (EOFException eof) {
+            // Do nothing
+          }
+        }
+      }
+
+      if(!file2Done) {
+        while (true) {
+          mergeOut.writeByte(length2);
+          mergeOut.write(file2Bytes, 0, length2);
+          mergeOut.writeFloat(f2);
+
+          try {
+            length2 = file2In.readByte();
+            file2In.read(file2Bytes, 0, length1);
+            f2 = file2In.readFloat();
+
+          } catch (EOFException eof) {
+            // Do nothing
+          }
+        }
+      }
+    } catch (Exception e) {
+      file1In.close();
+      file2In.close();
+      mergeOut.close();
+    }
+
+    return mergeFile;
   }
 
   public static class Record  {
@@ -187,19 +329,21 @@ public class ExternalFileUtil {
   public static class ByteComp implements Comparator<Record> {
 
     public int compare(Record rec1, Record rec2) {
-      return compare(rec1.bytes, rec1.length, rec2.bytes, rec2.length);
+      return ExternalFileUtil.compare(rec1.bytes, rec1.length, rec2.bytes, rec2.length);
+    }
+  }
+
+  public static int compare(byte[] left, int length1, byte[] right, int length2) {
+
+    for (int i = 0, j = 0; i < length1 && j < length2; i++, j++) {
+      byte a = left[i];
+      byte b = right[j];
+      if (a != b) {
+        return a - b;
+      }
     }
 
-    int compare(byte[] left, int length1, byte[] right, int length2) {
-      for (int i = 0, j = 0; i < length1 && j < length2; i++, j++) {
-        byte a = left[i];
-        byte b = right[j];
-        if (a != b) {
-          return a - b;
-        }
-      }
-      return length1 - length2;
-    }
+    return length1 - length2;
   }
 
 
