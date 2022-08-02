@@ -26,16 +26,17 @@ import org.apache.solr.common.util.Hash;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class ExternalFileUtil {
 
   private static final int HASH_SEED = 12131344;
   private static final int HASH_DIRS = 250;
   private static final String SHARD_TEMP_FILE = "temp.bin";
-  private static final String FINAL_PARTITION_PREFIX = "partition_";
+  public static final String FINAL_PARTITION_PREFIX = "partition_";
   private static final String MERGE_FILE_PREFIX = "merge_";
   private static final String SHARD_COMPLETE_FILE = "shard_complete";
-  private static final int NUM_PARTITIONS = 11;
+  public static final int NUM_PARTITIONS = 11;
   private static final int SORT_PARTITION_SIZE = 50000;
 
   public static void main(String[] args) throws Exception{
@@ -48,6 +49,7 @@ public class ExternalFileUtil {
     String mainCollection = args[3];
 
     CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
+    ExecutorService executor = Executors.newFixedThreadPool(8);
 
     try {
       solrClient.connect();
@@ -75,7 +77,6 @@ public class ExternalFileUtil {
 
     if(!refresh(externalFile, outRoot)) {
       System.out.println("Old Data External File:"+externalFile.file);
-
       return;
     }
 
@@ -116,9 +117,12 @@ public class ExternalFileUtil {
         dataOutputStream.close();
       }
     }
+    long start = System.nanoTime();
 
     partitionShards(shardHomes);
     sortPartitions(shardHomes);
+    long end = System.nanoTime();
+    System.out.println("Time:"+(end-start)/(1_000_000));
   }
 
   public static void sortPartitions(List<File> shardHomes) throws IOException {
@@ -385,7 +389,7 @@ public class ExternalFileUtil {
           byte b = tempStream.readByte();
           tempStream.read(bytes, 0, b);
           float f = tempStream.readFloat();
-          int hash = Hash.murmurhash3_x86_32(bytes, 0, b, HASH_SEED);
+          int hash = hashCode(bytes, 0, b);
           int bucket = Math.abs(hash % partitions.length);
           if(partitions[bucket] == null) {
             partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(shardHome, SHARD_TEMP_FILE+"."+bucket))));
