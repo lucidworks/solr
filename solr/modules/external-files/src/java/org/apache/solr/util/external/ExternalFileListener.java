@@ -25,10 +25,15 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.core.SolrEventListener;
 import org.apache.solr.search.SolrIndexSearcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.lang.invoke.MethodHandles;
 
 public class ExternalFileListener implements SolrEventListener {
+
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final String ID  = "id";
 
@@ -39,7 +44,11 @@ public class ExternalFileListener implements SolrEventListener {
   public void newSearcher(SolrIndexSearcher newSearcher, SolrIndexSearcher currentSearcher) {
     DataOutputStream[] partitions = new DataOutputStream[ExternalFileUtil.NUM_PARTITIONS];
     try {
-      String dataDir = newSearcher.getCore().getCoreDescriptor().getDataDir();
+
+      String dataDir = newSearcher.getCore().getIndexDir();
+
+      File dataDirFile = new File(dataDir);
+      log.info("ExternalFileListener write file to {}", dataDirFile.getAbsolutePath());
       IndexReader reader = newSearcher.getTopReaderContext().reader();
 
       TermsEnum termsEnum = MultiTerms.getTerms(reader, ID).iterator();
@@ -48,12 +57,12 @@ public class ExternalFileListener implements SolrEventListener {
       int doc = -1;
 
       while((bytesRef = termsEnum.next()) != null) {
-        termsEnum.postings(postingsEnum);
+        postingsEnum = termsEnum.postings(postingsEnum, PostingsEnum.NONE);
         while ((doc = postingsEnum.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
           int hash = ExternalFileUtil.hashCode(bytesRef.bytes, bytesRef.offset, bytesRef.length);
           int bucket = Math.abs(hash) % partitions.length;
           if(partitions[bucket] == null) {
-            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDir, ExternalFileUtil.FINAL_PARTITION_PREFIX+"."+bucket))));
+            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDirFile, ExternalFileUtil.FINAL_PARTITION_PREFIX+Integer.toString(bucket)))));
           }
           partitions[bucket].writeByte(bytesRef.length);
           partitions[bucket].write(bytesRef.bytes, bytesRef.offset, bytesRef.length);
@@ -61,6 +70,8 @@ public class ExternalFileListener implements SolrEventListener {
         }
       }
     } catch (Exception e) {
+      log.error("ExternalFileListener Error", e);
+    } finally {
       for(DataOutputStream dataOutputStream : partitions) {
         if(dataOutputStream != null) {
           try {
