@@ -43,11 +43,13 @@ public class ExternalFileListener implements SolrEventListener {
 
   public void newSearcher(SolrIndexSearcher newSearcher, SolrIndexSearcher currentSearcher) {
     DataOutputStream[] partitions = new DataOutputStream[ExternalFileUtil.NUM_PARTITIONS];
+    String dataDir = newSearcher.getCore().getIndexDir();
+    String newSearcherID = Integer.toHexString(newSearcher.hashCode());
+    String currentSearcherID = Integer.toHexString(currentSearcher.hashCode());
+    File dataDirFile = new File(dataDir);
+
     try {
 
-      String dataDir = newSearcher.getCore().getIndexDir();
-
-      File dataDirFile = new File(dataDir);
       log.info("ExternalFileListener write file to {}", dataDirFile.getAbsolutePath());
       IndexReader reader = newSearcher.getTopReaderContext().reader();
 
@@ -62,7 +64,7 @@ public class ExternalFileListener implements SolrEventListener {
           int hash = ExternalFileUtil.hashCode(bytesRef.bytes, bytesRef.offset, bytesRef.length);
           int bucket = Math.abs(hash) % partitions.length;
           if(partitions[bucket] == null) {
-            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDirFile, ExternalFileUtil.FINAL_PARTITION_PREFIX+Integer.toString(bucket)))));
+            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDirFile, newSearcherID+"_"+ExternalFileUtil.FINAL_PARTITION_PREFIX+Integer.toString(bucket)))));
           }
           partitions[bucket].writeByte(bytesRef.length);
           partitions[bucket].write(bytesRef.bytes, bytesRef.offset, bytesRef.length);
@@ -78,6 +80,16 @@ public class ExternalFileListener implements SolrEventListener {
             dataOutputStream.close();
           } catch (Exception e1) {
             //Log it.
+          }
+        }
+      }
+
+      //Clean up old files.
+      String[] files = dataDirFile.list();
+      for(String file : files) {
+        if(file.contains(ExternalFileUtil.FINAL_PARTITION_PREFIX)) {
+          if(!file.startsWith(newSearcherID) && !file.startsWith(currentSearcherID)) {
+            new File(dataDirFile, file).delete();
           }
         }
       }
