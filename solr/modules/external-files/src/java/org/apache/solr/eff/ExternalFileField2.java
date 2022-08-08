@@ -55,23 +55,21 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
      * Get a FileFloatSource for the given field, using the datadir from the
      * IndexSchema
      * @param field the field to get a source for
-     * @return a FileFloatSource
+     * @return a FileFloatSource2
      */
     public FileFloatSource2 getFileFloatSource2(SchemaField field) {
         return getFileFloatSource2(field, SolrRequestInfo.getRequestInfo().getReq().getCore().getDataDir());
     }
 
     /**
-     * Get a FileFloatSource for the given field.  Call this in preference to
+     * Get a FileFloatSource2 for the given field.  Call this in preference to
      * getFileFloatSource(SchemaField) if this may be called before the Core is
      * fully initialised (eg in SolrEventListener calls).
      * @param field the field to get a source for
      * @param datadir the data directory in which to look for the external file
-     * @return a FileFloatSource
+     * @return a FileFloatSource2
      */
     public FileFloatSource2 getFileFloatSource2(SchemaField field, String datadir) {
-        // Because the float source uses a static cache, all source objects will
-        // refer to the same data.
         return new FileFloatSource2(field, getKeyField(), defVal, datadir);
     }
 
