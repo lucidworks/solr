@@ -25,10 +25,8 @@ import java.lang.invoke.MethodHandles;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.WeakHashMap;
 
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexReaderContext;
@@ -42,15 +40,11 @@ import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.docvalues.FloatDocValues;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.BytesRefBuilder;
-import org.apache.solr.handler.RequestHandlerBase;
-import org.apache.solr.handler.RequestHandlerUtils;
-import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.request.SolrRequestInfo;
-import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.SolrCache;
-import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.util.VersionedFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,13 +52,12 @@ import org.slf4j.LoggerFactory;
 /**
  * Obtains float field values from an external file.
  *
- * @see org.apache.solr.schema.ExternalFileField
- * @see org.apache.solr.schema.ExternalFileFieldReloader
+ * @see ExternalFileField2
  */
 
 public class FileFloatSource2 extends ValueSource {
 
-    private SchemaField field;
+    private final SchemaField field;
     private final SchemaField keyField;
     private final float defVal;
     private final String dataDir;
@@ -72,7 +65,7 @@ public class FileFloatSource2 extends ValueSource {
     private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     /**
-     * Creates a new FileFloatSource
+     * Creates a new FileFloatSource2
      * @param field the source's SchemaField
      * @param keyField the field to use as a key
      * @param defVal the default value to use if a field has no entry in the external file
@@ -92,7 +85,6 @@ public class FileFloatSource2 extends ValueSource {
 
     @Override
     @SuppressWarnings({"rawtypes"})
-
     public FunctionValues getValues(Map context, LeafReaderContext readerContext) throws IOException {
         final int off = readerContext.docBase;
         IndexReaderContext topLevelContext = ReaderUtil.getTopLevelContext(readerContext);
@@ -108,7 +100,7 @@ public class FileFloatSource2 extends ValueSource {
 
             @Override
             public Object objectVal(int doc) {
-                return floatVal(doc);   // TODO: keep track of missing values
+                return floatVal(doc);
             }
         };
     }
@@ -130,45 +122,24 @@ public class FileFloatSource2 extends ValueSource {
 
     @Override
     public String toString() {
-        return "FileFloatSource(field="+field.getName()+",keyField="+keyField.getName()
+        return "FileFloatSource2(field="+field.getName()+",keyField="+keyField.getName()
                 + ",defVal="+defVal+",dataDir="+dataDir+")";
 
     }
 
-    /**
-     * Remove all cached entries.  Values are lazily loaded next time getValues() is
-     * called.
-     */
-    public static void resetCache(){
-        floatCache.resetCache();
-    }
-
-    /**
-     * Refresh the cache for an IndexReader.  The new values are loaded in the background
-     * and then swapped in, so queries against the cache should not block while the reload
-     * is happening.
-     * @param reader the IndexReader whose cache needs refreshing
-     */
-    public void refreshCache(IndexReader reader) {
-        if (log.isInfoEnabled()) {
-            log.info("Refreshing FileFloatSource cache for field {}", this.field.getName());
-        }
-        floatCache.refresh(reader, new Entry(this));
-        if (log.isInfoEnabled()) {
-            log.info("FileFloatSource cache for field {} reloaded", this.field.getName());
-        }
-    }
-
-    private final float[] getCachedFloats(IndexReader reader) {
+    private float[] getCachedFloats(IndexReader reader) {
         Entry key = new Entry(this);
+
+        String cacheName = "fileFloatSourceCache_" + field.getType().getTypeName();
 
         // SolrCache is named by the field type name so dynamic field patterns pointing to the same type will share the same cache
         @SuppressWarnings("unchecked")
         final SolrCache<Entry,float[]> cache =
-                SolrRequestInfo.getRequestInfo().getReq().getSearcher().getCache("fileFloatSourceCache_" + field.getType().getTypeName());
+                SolrRequestInfo.getRequestInfo().getReq().getSearcher().getCache(cacheName);
 
-        // if no SolrCache is defined, use legacy behavior which keeps all the float[]'s ever built for the current reader
-        if (cache == null) return (float[])floatCache.get(reader, key);
+        if (cache == null) {
+            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Cache '" + cacheName + "' must be defined to use this field type and value source");
+        }
 
         float[] floats;
         try {
@@ -180,87 +151,8 @@ public class FileFloatSource2 extends ValueSource {
         return floats;
     }
 
-    static Cache floatCache = new Cache() {
-        @Override
-        protected Object createValue(IndexReader reader, Object key) {
-            return getFloats(((Entry)key).ffs, reader);
-        }
-    };
-
-    /** Internal cache. (from lucene FieldCache) */
-    abstract static class Cache {
-        @SuppressWarnings({"rawtypes"})
-        private final Map readerCache = new WeakHashMap();
-
-        protected abstract Object createValue(IndexReader reader, Object key);
-
-        @SuppressWarnings({"unchecked"})
-        public void refresh(IndexReader reader, Object key) {
-            Object refreshedValues = createValue(reader, key);
-            synchronized (readerCache) {
-                @SuppressWarnings({"rawtypes"})
-                Map innerCache = (Map) readerCache.get(reader);
-                if (innerCache == null) {
-                    innerCache = new HashMap<>();
-                    readerCache.put(reader, innerCache);
-                }
-                innerCache.put(key, refreshedValues);
-            }
-        }
-
-        @SuppressWarnings({"unchecked"})
-        public Object get(IndexReader reader, Object key) {
-            @SuppressWarnings({"rawtypes"})
-            Map innerCache;
-            Object value;
-            synchronized (readerCache) {
-                innerCache = (Map) readerCache.get(reader);
-                if (innerCache == null) {
-                    innerCache = new HashMap<>();
-                    readerCache.put(reader, innerCache);
-                    value = null;
-                } else {
-                    value = innerCache.get(key);
-                }
-                if (value == null) {
-                    value = new CreationPlaceholder();
-                    innerCache.put(key, value);
-                }
-            }
-            if (value instanceof CreationPlaceholder) {
-                synchronized (value) {
-                    CreationPlaceholder progress = (CreationPlaceholder) value;
-                    if (progress.value == null) {
-                        progress.value = createValue(reader, key);
-                        synchronized (readerCache) {
-                            innerCache.put(key, progress.value);
-                            onlyForTesting = progress.value;
-                        }
-                    }
-                    return progress.value;
-                }
-            }
-
-            return value;
-        }
-
-        public void resetCache(){
-            synchronized(readerCache){
-                // Map.clear() is optional and can throw UnsupportedOperationException,
-                // but readerCache is WeakHashMap and it supports clear().
-                readerCache.clear();
-            }
-        }
-    }
-
-    static Object onlyForTesting; // set to the last value
-
-    static final class CreationPlaceholder {
-        Object value;
-    }
-
     /** Expert: Every composite-key in the internal cache is of this type. */
-    public class Entry {
+    public static class Entry {
         public final FileFloatSource2 ffs;
         public Entry(FileFloatSource2 ffs) {
             this.ffs = ffs;
