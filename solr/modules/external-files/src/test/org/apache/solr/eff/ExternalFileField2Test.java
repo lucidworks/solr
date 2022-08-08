@@ -139,10 +139,13 @@ public class ExternalFileField2Test extends SolrTestCaseJ4 {
         assertU(commit());  // reset caches
         assertQ(req("q", "id:2112"), "//*[@numFound='1']");
 
+        // .withSearcher doesn't seem to work for this next test, so doing it the old-fashioned way
         waitForWarming();
-        SolrIndexSearcher newestSearcher = h.getCore().getNewestSearcher(true).get();
+        RefCounted<SolrIndexSearcher> refCounted = h.getCore().getNewestSearcher(true);
+        SolrIndexSearcher newestSearcher = refCounted.get();
         SolrCache<?,?> c = newestSearcher.getCache("fileFloatSourceCache_effWarmed");
         assertEquals(1, c.size());
+        refCounted.decref();
 
         // `effWarmed` is configured to warm 1 item
         h.getCore().withSearcher(searcher -> {
