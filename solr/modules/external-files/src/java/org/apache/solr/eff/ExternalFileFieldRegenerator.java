@@ -10,7 +10,7 @@ import java.io.IOException;
 public class ExternalFileFieldRegenerator implements CacheRegenerator {
     @Override
     public <K, V> boolean regenerateItem(SolrIndexSearcher newSearcher, SolrCache<K, V> newCache, SolrCache<K, V> oldCache, K oldKey, V oldVal) throws IOException {
-        FileFloatSource2 ffs = ((FileFloatSource2.Entry)oldKey).ffs;
+        FileFloatSource2 ffs = ((FileFloatSource2.Entry) oldKey).ffs;
         newCache.put(oldKey, (V) FileFloatSource2.getFloats(ffs, newSearcher.getIndexReader()));
         return true;
     }

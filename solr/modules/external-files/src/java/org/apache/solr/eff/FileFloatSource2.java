@@ -66,10 +66,11 @@ public class FileFloatSource2 extends ValueSource {
 
     /**
      * Creates a new FileFloatSource2
-     * @param field the source's SchemaField
+     *
+     * @param field    the source's SchemaField
      * @param keyField the field to use as a key
-     * @param defVal the default value to use if a field has no entry in the external file
-     * @param datadir the directory in which to look for the external file
+     * @param defVal   the default value to use if a field has no entry in the external file
+     * @param datadir  the directory in which to look for the external file
      */
     public FileFloatSource2(SchemaField field, SchemaField keyField, float defVal, String datadir) {
         this.field = field;
@@ -107,8 +108,8 @@ public class FileFloatSource2 extends ValueSource {
 
     @Override
     public boolean equals(Object o) {
-        if (o.getClass() !=  FileFloatSource2.class) return false;
-        FileFloatSource2 other = (FileFloatSource2)o;
+        if (o.getClass() != FileFloatSource2.class) return false;
+        FileFloatSource2 other = (FileFloatSource2) o;
         return this.field.getName().equals(other.field.getName())
                 && this.keyField.getName().equals(other.keyField.getName())
                 && this.defVal == other.defVal
@@ -122,8 +123,8 @@ public class FileFloatSource2 extends ValueSource {
 
     @Override
     public String toString() {
-        return "FileFloatSource2(field="+field.getName()+",keyField="+keyField.getName()
-                + ",defVal="+defVal+",dataDir="+dataDir+")";
+        return "FileFloatSource2(field=" + field.getName() + ",keyField=" + keyField.getName()
+                + ",defVal=" + defVal + ",dataDir=" + dataDir + ")";
 
     }
 
@@ -133,8 +134,7 @@ public class FileFloatSource2 extends ValueSource {
         String cacheName = "fileFloatSourceCache_" + field.getType().getTypeName();
 
         // SolrCache is named by the field type name so dynamic field patterns pointing to the same type will share the same cache
-        @SuppressWarnings("unchecked")
-        final SolrCache<Entry,float[]> cache =
+        @SuppressWarnings("unchecked") final SolrCache<Entry, float[]> cache =
                 SolrRequestInfo.getRequestInfo().getReq().getSearcher().getCache(cacheName);
 
         if (cache == null) {
@@ -151,9 +151,12 @@ public class FileFloatSource2 extends ValueSource {
         return floats;
     }
 
-    /** Expert: Every composite-key in the internal cache is of this type. */
+    /**
+     * Expert: Every composite-key in the internal cache is of this type.
+     */
     public static class Entry {
         public final FileFloatSource2 ffs;
+
         public Entry(FileFloatSource2 ffs) {
             this.ffs = ffs;
         }
@@ -161,7 +164,7 @@ public class FileFloatSource2 extends ValueSource {
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Entry)) return false;
-            Entry other = (Entry)o;
+            Entry other = (Entry) o;
             return ffs.equals(other.ffs);
         }
 
@@ -197,10 +200,10 @@ public class FileFloatSource2 extends ValueSource {
         // trying to use skipTo()
 
         List<String> notFound = new ArrayList<>();
-        int notFoundCount=0;
-        int otherErrors=0;
+        int notFoundCount = 0;
+        int otherErrors = 0;
 
-        char delimiter='=';
+        char delimiter = '=';
 
         BytesRefBuilder internalKey = new BytesRefBuilder();
 
@@ -211,20 +214,20 @@ public class FileFloatSource2 extends ValueSource {
             // removing deleted docs shouldn't matter
             // final Bits liveDocs = MultiLeafReader.getLiveDocs(reader);
 
-            for (String line; (line=r.readLine())!=null;) {
+            for (String line; (line = r.readLine()) != null; ) {
                 int delimIndex = line.lastIndexOf(delimiter);
                 if (delimIndex < 0) continue;
 
                 int endIndex = line.length();
                 String key = line.substring(0, delimIndex);
-                String val = line.substring(delimIndex+1, endIndex);
+                String val = line.substring(delimIndex + 1, endIndex);
 
                 float fval;
                 try {
                     idType.readableToIndexed(key, internalKey);
-                    fval=Float.parseFloat(val);
+                    fval = Float.parseFloat(val);
                 } catch (Exception e) {
-                    if (++otherErrors<=10) {
+                    if (++otherErrors <= 10) {
                         log.error("Error loading external value source + fileName + {}{}", e
                                 , (otherErrors < 10 ? "" : "\tSkipping future errors for this file."));
                     }
@@ -232,7 +235,7 @@ public class FileFloatSource2 extends ValueSource {
                 }
 
                 if (!termsEnum.seekExact(internalKey.get())) {
-                    if (notFoundCount<10) {  // collect first 10 not found for logging
+                    if (notFoundCount < 10) {  // collect first 10 not found for logging
                         notFound.add(key);
                     }
                     notFoundCount++;
@@ -252,7 +255,10 @@ public class FileFloatSource2 extends ValueSource {
         } finally {
             // swallow exceptions on close so we don't override any
             // exceptions that happened in the loop
-            try{r.close();}catch(Exception e){}
+            try {
+                r.close();
+            } catch (Exception e) {
+            }
         }
         if (log.isInfoEnabled()) {
             String tmp = (notFoundCount == 0 ? "" : " :" + notFoundCount + " missing keys " + notFound);

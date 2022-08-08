@@ -36,7 +36,7 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
     }
 
     @Override
-    public SortField getSortField(SchemaField field,boolean reverse) {
+    public SortField getSortField(SchemaField field, boolean reverse) {
         FileFloatSource2 source = getFileFloatSource2(field);
         return source.getSortField(reverse);
     }
@@ -54,6 +54,7 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
     /**
      * Get a FileFloatSource for the given field, using the datadir from the
      * IndexSchema
+     *
      * @param field the field to get a source for
      * @return a FileFloatSource2
      */
@@ -65,7 +66,8 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
      * Get a FileFloatSource2 for the given field.  Call this in preference to
      * getFileFloatSource(SchemaField) if this may be called before the Core is
      * fully initialised (eg in SolrEventListener calls).
-     * @param field the field to get a source for
+     *
+     * @param field   the field to get a source for
      * @param datadir the data directory in which to look for the external file
      * @return a FileFloatSource2
      */
