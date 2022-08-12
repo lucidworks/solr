@@ -23,6 +23,14 @@ Introduction
 A highly scalable implementation of externally provided `float` type data,
 allowing for many keyed values for a single, dynamically mapped field. 
 
+Use Cases
+---------
+ * Custom pricing, for example a B2B organization which prices a product differently depending on which 
+   "catalog" or store it is within, where there potentially tens of thousands of catalogs making modeling price
+   arduous in a more traditional, individual field, way.
+   
+ * Warehouse inventory
+
 Example
 -------
 
@@ -32,8 +40,9 @@ Run the following script to see ExternalFileField2 in action:
     export COLLECTION=products
     bin/solr start -c -Dsolr.modules=external-files
     bin/solr create -c $COLLECTION
-    bin/post -c $COLLECTION -type text/csv -out yes -d $'id,default_price_f\n1,42.42'
-    echo "1=37.97" > server/solr/${COLLECTION}_shard1_replica_n1/data/external_price_00001
+    bin/post -c $COLLECTION -type text/csv -out yes -d $'id,default_price_f\n1,42.42\n2,57.36\n3,107.49'
+    echo "1=37.97\n3=99.95" > server/solr/${COLLECTION}_shard1_replica_n1/data/external_price_00001
+    echo "1=39.95\n2=103.97" > server/solr/${COLLECTION}_shard1_replica_n1/data/external_price_00002
 
     # Add cache for `external_prices`    
     curl -X POST -H 'Content-type:application/json' -d '{
@@ -68,9 +77,8 @@ Run the following script to see ExternalFileField2 in action:
          "stored": "false" }
     }' http://localhost:8983/api/collections/$COLLECTION/schema
 
-
     # Search for products within the context of store `00001`, returning, and sorting by computed price:
-    curl "http://localhost:8983/solr/$COLLECTION/select?q=*:*&store=00001&price_field=price_$\{store\}&computed_price=if(eq(field($\{price_field\}),0.00),default_price_f,field($\{price_field\}))&fl=id,default_price_f,computed_price:$\{computed_price\}&sort=$\{computed_price\}+asc"
+    curl "http://localhost:8983/solr/$COLLECTION/select?q=*:*&facet=on&facet.query=\{\!frange+key=upto_100+l=0+u=100\}$\{computed_price\}&facet.query=\{\!frange+key=over_100+l=100+incl=false\}$\{computed_price\}&price_field=price_$\{store\}&computed_price=if(eq(field($\{price_field\}),0.00),default_price_f,field($\{price_field\}))&fl=id,default_price_f,computed_price:$\{computed_price\}&sort=$\{computed_price\}+asc&store=00001"
 
     # Fetch cache stats available here:
     curl "http://localhost:8983/solr/admin/metrics?m=solr.core.$COLLECTION.shard1.replica_n1:CACHE.searcher.fileFloatSourceCache_external_prices&key=$\{m\}:size&key=$\{m\}:lookups&key=$\{m\}:hits&key=$\{m\}:hitratio&key=$\{m\}:inserts&key=$\{m\}:evictions&key=$\{m\}:warmupTime&key=$\{m\}:ramBytesUsed"  
