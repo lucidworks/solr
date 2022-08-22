@@ -35,11 +35,13 @@ public class ExternalFileListener implements SolrEventListener {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private static final String ID  = "id";
+  private static final String ID = "id";
 
-  public void postCommit() {}
+  public void postCommit() {
+  }
 
-  public void postSoftCommit() {}
+  public void postSoftCommit() {
+  }
 
   public void newSearcher(SolrIndexSearcher newSearcher, SolrIndexSearcher currentSearcher) {
     DataOutputStream[] partitions = new DataOutputStream[ExternalFileUtil.NUM_PARTITIONS];
@@ -58,13 +60,13 @@ public class ExternalFileListener implements SolrEventListener {
       PostingsEnum postingsEnum = null;
       int doc = -1;
 
-      while((bytesRef = termsEnum.next()) != null) {
+      while ((bytesRef = termsEnum.next()) != null) {
         postingsEnum = termsEnum.postings(postingsEnum, PostingsEnum.NONE);
         while ((doc = postingsEnum.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
           int hash = ExternalFileUtil.hashCode(bytesRef.bytes, bytesRef.offset, bytesRef.length);
           int bucket = Math.abs(hash) % partitions.length;
-          if(partitions[bucket] == null) {
-            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDirFile, newSearcherID+"_"+ExternalFileUtil.FINAL_PARTITION_PREFIX+Integer.toString(bucket)))));
+          if (partitions[bucket] == null) {
+            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDirFile, newSearcherID + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(bucket)))));
           }
           partitions[bucket].writeByte(bytesRef.length);
           partitions[bucket].write(bytesRef.bytes, bytesRef.offset, bytesRef.length);
@@ -74,21 +76,21 @@ public class ExternalFileListener implements SolrEventListener {
     } catch (Exception e) {
       log.error("ExternalFileListener Error", e);
     } finally {
-      for(DataOutputStream dataOutputStream : partitions) {
-        if(dataOutputStream != null) {
+      for (DataOutputStream dataOutputStream : partitions) {
+        if (dataOutputStream != null) {
           try {
             dataOutputStream.close();
           } catch (Exception e1) {
-            //Log it.
+            log.error("Error closing output stream.", e1);
           }
         }
       }
 
       //Clean up old files.
       String[] files = dataDirFile.list();
-      for(String file : files) {
-        if(file.contains(ExternalFileUtil.FINAL_PARTITION_PREFIX)) {
-          if(!file.startsWith(newSearcherID) && !file.startsWith(currentSearcherID)) {
+      for (String file : files) {
+        if (file.contains(ExternalFileUtil.FINAL_PARTITION_PREFIX)) {
+          if (!file.startsWith(newSearcherID) && !file.startsWith(currentSearcherID)) {
             new File(dataDirFile, file).delete();
           }
         }

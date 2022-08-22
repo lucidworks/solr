@@ -39,7 +39,7 @@ public class ExternalFileUtil {
   public static final int NUM_PARTITIONS = 11;
   private static final int SORT_PARTITION_SIZE = 50000;
 
-  public static void main(String[] args) throws Exception{
+  public static void main(String[] args) throws Exception {
 
     String inRoot = args[0];
     String outRoot = args[1];
@@ -73,10 +73,10 @@ public class ExternalFileUtil {
 
   public static void process(ExternalFile externalFile, String outRoot, CloudSolrClient cloudSolrClient, String mainCollection) throws IOException {
 
-    System.out.println("Processing External File:"+externalFile.file);
+    System.out.println("Processing External File:" + externalFile.file);
 
-    if(!refresh(externalFile, outRoot)) {
-      System.out.println("Old Data External File:"+externalFile.file);
+    if (!refresh(externalFile, outRoot)) {
+      System.out.println("Old Data External File:" + externalFile.file);
       return;
     }
 
@@ -89,13 +89,13 @@ public class ExternalFileUtil {
     try {
       in = new BufferedReader(new FileReader(externalFile.file));
       String line = null;
-      while((line = in.readLine()) != null) {
+      while ((line = in.readLine()) != null) {
         String[] pair = line.split(":");
         String id = pair[0].trim();
         float f = Float.parseFloat(pair[1]);
         Slice slice = docRouter.getTargetSlice(id, null, null, null, docCollection);
         String shardId = slice.getName();
-        if(shardOuts.containsKey(shardId)) {
+        if (shardOuts.containsKey(shardId)) {
           DataOutputStream shardOut = shardOuts.get(shardId);
           byte[] bytes = id.getBytes();
           shardOut.writeByte(bytes.length);
@@ -113,7 +113,7 @@ public class ExternalFileUtil {
       }
     } finally {
       in.close();
-      for(DataOutputStream dataOutputStream : shardOuts.values()) {
+      for (DataOutputStream dataOutputStream : shardOuts.values()) {
         dataOutputStream.close();
       }
     }
@@ -122,12 +122,12 @@ public class ExternalFileUtil {
     partitionShards(shardHomes);
     sortPartitions(shardHomes);
     long end = System.nanoTime();
-    System.out.println("Time:"+(end-start)/(1_000_000));
+    System.out.println("Time:" + (end - start) / (1_000_000));
   }
 
   public static void sortPartitions(List<File> shardHomes) throws IOException {
-    for(File shardHome : shardHomes) {
-      for(int i=0; i<NUM_PARTITIONS; i++) {
+    for (File shardHome : shardHomes) {
+      for (int i = 0; i < NUM_PARTITIONS; i++) {
         sortPartition(shardHome, i);
       }
       // Write the partition file
@@ -144,14 +144,14 @@ public class ExternalFileUtil {
     try {
       LinkedList<File> segments = new LinkedList<>();
 
-      if(!partitionFile.exists()) {
+      if (!partitionFile.exists()) {
         return segments;
       }
 
       partitionIn = new DataInputStream(new BufferedInputStream(new FileInputStream(partitionFile)));
       int segment = 0;
       boolean finished = false;
-      while(!finished) {
+      while (!finished) {
         for (int i = 0; i < SORT_PARTITION_SIZE; i++) {
           try {
             Record record = new Record();
@@ -163,7 +163,7 @@ public class ExternalFileUtil {
           }
         }
 
-        if(records.size() > 0) {
+        if (records.size() > 0) {
           Collections.sort(records, byteComp);
           File segmentFile = new File(shardHome, SHARD_TEMP_FILE + "." + partitionIn + "." + segment);
           segments.addLast(segmentFile);
@@ -173,20 +173,20 @@ public class ExternalFileUtil {
         }
       }
       File finalSegment = mergeSegments(segments);
-      finalSegment.renameTo(new File(finalSegment.getParentFile(), FINAL_PARTITION_PREFIX+partitionNumber));
+      finalSegment.renameTo(new File(finalSegment.getParentFile(), FINAL_PARTITION_PREFIX + partitionNumber));
       return segments;
     } finally {
       partitionFile.delete();
     }
   }
 
-  public static void writeSortedSegment(File segmentFile, List<Record>records) throws IOException {
+  public static void writeSortedSegment(File segmentFile, List<Record> records) throws IOException {
 
     DataOutputStream outSegment = null;
 
     try {
       outSegment = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(segmentFile)));
-      for(Record record : records) {
+      for (Record record : records) {
         outSegment.writeByte(record.length);
         outSegment.write(record.bytes, 0, record.length);
         outSegment.writeFloat(record.f);
@@ -199,7 +199,7 @@ public class ExternalFileUtil {
   public static File mergeSegments(LinkedList<File> segments) throws IOException {
     // Merge is a circular motion until there is only one segment.
     int mergeCount = 0;
-    while(segments.size() > 1) {
+    while (segments.size() > 1) {
       ++mergeCount;
       File file1 = segments.removeFirst();
       File file2 = segments.removeFirst();
@@ -220,7 +220,7 @@ public class ExternalFileUtil {
     DataInputStream file1In = null;
     DataInputStream file2In = null;
     DataOutputStream mergeOut = null;
-    File mergeFile = new File(file1.getParentFile(), MERGE_FILE_PREFIX+Integer.toString(mergeCount));
+    File mergeFile = new File(file1.getParentFile(), MERGE_FILE_PREFIX + Integer.toString(mergeCount));
 
     try {
       mergeOut = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(mergeFile)));
@@ -297,7 +297,7 @@ public class ExternalFileUtil {
       }
 
       //One of the files is done write out the other file
-      if(!file1Done) {
+      if (!file1Done) {
         while (true) {
 
           mergeOut.writeByte(length1);
@@ -316,7 +316,7 @@ public class ExternalFileUtil {
         }
       }
 
-      if(!file2Done) {
+      if (!file2Done) {
         while (true) {
           mergeOut.writeByte(length2);
           mergeOut.write(file2Bytes, 0, length2);
@@ -379,7 +379,7 @@ public class ExternalFileUtil {
     //Process the shard files
     byte[] bytes = new byte[128];
 
-    for(File shardHome : shardHomes) {
+    for (File shardHome : shardHomes) {
       DataOutputStream[] partitions = new DataOutputStream[NUM_PARTITIONS];
       DataInputStream tempStream = null;
       File tempFile = new File(shardHome, SHARD_TEMP_FILE);
@@ -391,8 +391,8 @@ public class ExternalFileUtil {
           float f = tempStream.readFloat();
           int hash = hashCode(bytes, 0, b);
           int bucket = Math.abs(hash % partitions.length);
-          if(partitions[bucket] == null) {
-            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(shardHome, SHARD_TEMP_FILE+"."+bucket))));
+          if (partitions[bucket] == null) {
+            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(shardHome, SHARD_TEMP_FILE + "." + bucket))));
           }
 
           partitions[bucket].writeByte(b);
@@ -403,8 +403,8 @@ public class ExternalFileUtil {
         //File ended do nothing.
       } finally {
         tempStream.close();
-        for(DataOutputStream dataOutputStream : partitions) {
-          if(dataOutputStream != null) {
+        for (DataOutputStream dataOutputStream : partitions) {
+          if (dataOutputStream != null) {
             dataOutputStream.close();
           }
         }
@@ -415,30 +415,31 @@ public class ExternalFileUtil {
 
   public static boolean refresh(ExternalFile externalFile, String outRoot) {
     File cdir = getCustomerOutDir(outRoot, externalFile);
-    System.out.println("Customer outdir:"+cdir);
+    System.out.println("Customer outdir:" + cdir);
 
-    if(!cdir.exists()) {
+    if (!cdir.exists()) {
       cdir.mkdirs();
       return true;
     }
 
     String[] dirs = cdir.list();
-    for(String dir : dirs) {
+    for (String dir : dirs) {
       long ldir = Long.parseLong(dir);
-      if(externalFile.timeStamp > ldir) {
+      if (externalFile.timeStamp > ldir) {
         return true;
       }
     }
     return false;
   }
 
+
   public static String getHashDir(String customer) {
     int bucket = customer.hashCode() % HASH_DIRS;
-    return "bucket"+bucket;
+    return "bucket" + bucket;
   }
 
   public static File getCustomerOutDir(String outRoot, ExternalFile externalFile) {
-    return new File(new File(new File(new File(outRoot), getHashDir(externalFile.customer)), externalFile.customer), externalFile.type);
+    return new File(new File(new File(outRoot), getHashDir(externalFile.customer)), externalFile.customer);
   }
 
   public static DataOutputStream openShardOut(String outRoot, ExternalFile externalFile, String shardId, String fileName) throws IOException {
@@ -448,7 +449,7 @@ public class ExternalFileUtil {
   public static File getShardHome(String outRoot, ExternalFile externalFile, String shardId) {
     File custDir = getCustomerOutDir(outRoot, externalFile);
     File file = new File(new File(custDir, Long.toString(externalFile.timeStamp)), shardId);
-    if(!file.exists()) {
+    if (!file.exists()) {
       file.mkdirs();
     }
     return file;

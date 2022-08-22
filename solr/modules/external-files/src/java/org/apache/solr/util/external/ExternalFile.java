@@ -22,14 +22,12 @@ import java.util.Iterator;
 
 public class ExternalFile {
   long timeStamp;
-  String type;
   String customer;
   File file;
 
-  public ExternalFile(File file, String customer, long timeStamp, String type) {
+  public ExternalFile(File file, String customer, long timeStamp) {
     this.file = file;
     this.timeStamp = timeStamp;
-    this.type = type;
     this.customer = customer;
   }
 
@@ -59,7 +57,7 @@ public class ExternalFile {
     public ExternalFile next() {
       ++customerIndex;
       File file = new File("/Users/joelbernstein/tools/merge/test/customer1/pricing/1659368012/customer1.txt");
-      return new ExternalFile(file, "customer1", 121213131, "pricing");
+      return new ExternalFile(file, "customer1", 121213131);
     }
   }
 
