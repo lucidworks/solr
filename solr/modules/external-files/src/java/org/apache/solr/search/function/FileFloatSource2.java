@@ -61,6 +61,8 @@ public class FileFloatSource2 extends ValueSource {
   private final String dataDir;
   private final File externalDir;
   private final String fileNameStripped;
+  private final String searchId;
+  private final String shardId;
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -72,13 +74,15 @@ public class FileFloatSource2 extends ValueSource {
    * @param defVal the default value to use if a field has no entry in the external file
    * @param dataDir the directory in which to look for the external file
    */
-  public FileFloatSource2(SchemaField field, SchemaField keyField, float defVal, String dataDir, String externalDir) {
+  public FileFloatSource2(SchemaField field, SchemaField keyField, float defVal, String dataDir, String externalDir, String searcherId, String shardId) {
     this.field = field;
     this.fileNameStripped = field.getName().replace("_ef$", "");
     this.keyField = keyField;
     this.defVal = defVal;
     this.dataDir = dataDir;
     this.externalDir = new File(externalDir);
+    this.searchId = searcherId;
+    this.shardId = shardId;
   }
 
   @Override
@@ -277,7 +281,10 @@ public class FileFloatSource2 extends ValueSource {
 
   private static float[] getFloats(FileFloatSource2 ffs, IndexReader reader, CachedFloats cachedFloats) {
 
-    File latestExternalDir = getLatestFileDir(ffs.externalDir, ffs.fileNameStripped, cachedFloats == null ? -1 : cachedFloats.loadTime);
+    File latestExternalDir = getLatestFileDir(ffs.externalDir,
+        ffs.fileNameStripped,
+        ffs.shardId,
+        cachedFloats == null ? -1 : cachedFloats.loadTime);
 
     ExecutorService executorService = ExecutorUtil.newMDCAwareCachedThreadPool(8, new SolrNamedThreadFactory("FileFloatSource2"));
     float[] vals = new float[reader.maxDoc()];
@@ -293,7 +300,7 @@ public class FileFloatSource2 extends ValueSource {
     try {
 
       for(int i=0; i<8; i++) {
-        MergeJoin merger = new MergeJoin(new File(ffs.dataDir, "index_"+i+".bin"), new File(latestExternalDir, "external_"+i+".bin"), vals);
+        MergeJoin merger = new MergeJoin(new File(ffs.dataDir, ffs.searchId + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(i)), new File(latestExternalDir, "external_"+i+".bin"), vals);
         Future future = executorService.submit(merger);
         futures.add(future);
       }
@@ -402,7 +409,7 @@ public class FileFloatSource2 extends ValueSource {
     float[] floats;
   }
 
-  public static File getLatestFileDir(File root, String fileName, long afterTime) {
+  public static File getLatestFileDir(File root, String fileName, String shardId, long afterTime) {
 
     File fileHome = new File(new File(root, ExternalFileUtil.getHashDir(fileName)), fileName);
     if(!fileHome.exists()) {
@@ -423,7 +430,14 @@ public class FileFloatSource2 extends ValueSource {
           }
         }
 
-        return maxFile;
+        //Check if finished writing
+        File shardHome = new File(maxFile, shardId);
+        File shardComplete = new File(shardHome, ExternalFileUtil.SHARD_COMPLETE_FILE);
+        if(shardComplete.exists()) {
+          return shardHome;
+        } else {
+          return null;
+        }
       }
     }
   }

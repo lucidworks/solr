@@ -23,8 +23,10 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.response.TextResponseWriter;
 import org.apache.solr.search.QParser;
+import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.function.FileFloatSource2;
 import org.apache.solr.uninverting.UninvertingReader;
+import org.apache.solr.util.RefCounted;
 
 import java.io.IOException;
 import java.util.Map;
@@ -66,15 +68,25 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
     return getFileFloatSource(field);
   }
 
-  public FileFloatSource2 getFileFloatSource(SchemaField field, String datadir) {
+  public FileFloatSource2 getFileFloatSource(SchemaField field, String datadir, String searcherId, String shardId) {
     // Because the float source uses a static cache, all source objects will
     // refer to the same data.
-    return new FileFloatSource2(field, getKeyField(), defVal, datadir, getExternalRoot());
+    return new FileFloatSource2(field, getKeyField(), defVal, datadir, getExternalRoot(), searcherId, shardId);
   }
 
   public FileFloatSource2 getFileFloatSource(SchemaField field) {
+    RefCounted<SolrIndexSearcher> solrIndexSearcherRefCounted = SolrRequestInfo.getRequestInfo().getReq().getCore().getSearcher();
+    String searcherId = null;
+    try {
+      searcherId = Integer.toHexString(solrIndexSearcherRefCounted.get().hashCode());
+    } finally {
+      solrIndexSearcherRefCounted.decref();
+    }
+
+    String shardId = SolrRequestInfo.getRequestInfo().getReq().getCore().getCoreDescriptor().getCloudDescriptor().getShardId();
+
     return getFileFloatSource(
-        field, SolrRequestInfo.getRequestInfo().getReq().getCore().getDataDir());
+        field, SolrRequestInfo.getRequestInfo().getReq().getCore().getDataDir(), searcherId, shardId) ;
   }
 
   // If no key field is defined, we use the unique key field

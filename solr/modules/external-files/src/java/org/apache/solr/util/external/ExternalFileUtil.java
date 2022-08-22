@@ -35,7 +35,7 @@ public class ExternalFileUtil {
   private static final String SHARD_TEMP_FILE = "temp.bin";
   public static final String FINAL_PARTITION_PREFIX = "partition_";
   private static final String MERGE_FILE_PREFIX = "merge_";
-  private static final String SHARD_COMPLETE_FILE = "shard_complete";
+  public static final String SHARD_COMPLETE_FILE = "shard_complete";
   public static final int NUM_PARTITIONS = 11;
   private static final int SORT_PARTITION_SIZE = 50000;
 
