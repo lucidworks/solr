@@ -296,16 +296,16 @@ public class FileFloatSource2 extends ValueSource {
       return vals;
     }
 
-    List<Future> futures = new ArrayList();
+    List<Future<?>> futures = new ArrayList<>();
     try {
 
       for(int i=0; i<8; i++) {
         MergeJoin merger = new MergeJoin(new File(ffs.dataDir, ffs.searchId + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(i)), new File(latestExternalDir, "external_"+i+".bin"), vals);
-        Future future = executorService.submit(merger);
+        Future<?> future = executorService.submit(merger);
         futures.add(future);
       }
 
-      for(Future future : futures) {
+      for(Future<?> future : futures) {
         future.get();
       }
 

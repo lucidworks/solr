@@ -26,17 +26,17 @@ import org.apache.solr.common.util.Hash;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.*;
 
 public class ExternalFileUtil {
 
   private static final int HASH_SEED = 12131344;
   private static final int HASH_DIRS = 250;
   private static final String SHARD_TEMP_FILE = "temp.bin";
+  private static final String SEGMENT_TEMP_FILE = "segment.bin";
   public static final String FINAL_PARTITION_PREFIX = "partition_";
   private static final String MERGE_FILE_PREFIX = "merge_";
   public static final String SHARD_COMPLETE_FILE = "shard_complete";
-  public static final int NUM_PARTITIONS = 11;
+  public static final int NUM_PARTITIONS = 8;
   private static final int SORT_PARTITION_SIZE = 50000;
 
   public static void main(String[] args) throws Exception {
@@ -49,7 +49,6 @@ public class ExternalFileUtil {
     String mainCollection = args[3];
 
     CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
-    ExecutorService executor = Executors.newFixedThreadPool(8);
 
     try {
       solrClient.connect();
@@ -140,6 +139,7 @@ public class ExternalFileUtil {
     List<Record> records = new ArrayList<>(SORT_PARTITION_SIZE);
     ByteComp byteComp = new ByteComp();
     File partitionFile = new File(shardHome, SHARD_TEMP_FILE + "." + partitionNumber);
+    System.out.println("Sorting:"+partitionFile.getName());
 
     try {
       LinkedList<File> segments = new LinkedList<>();
@@ -165,7 +165,7 @@ public class ExternalFileUtil {
 
         if (records.size() > 0) {
           Collections.sort(records, byteComp);
-          File segmentFile = new File(shardHome, SHARD_TEMP_FILE + "." + partitionIn + "." + segment);
+          File segmentFile = new File(shardHome, SEGMENT_TEMP_FILE + "." + partitionNumber + "." + segment);
           segments.addLast(segmentFile);
           writeSortedSegment(segmentFile, records);
           records.clear();
@@ -214,6 +214,7 @@ public class ExternalFileUtil {
   }
 
   public static File merge(File file1, File file2, int mergeCount) throws IOException {
+    System.out.println("Merging:"+file1.getName()+" : "+file2.getName());
     byte[] file1Bytes = new byte[127];
     byte[] file2Bytes = new byte[127];
 
@@ -238,7 +239,12 @@ public class ExternalFileUtil {
       boolean file2Done = false;
 
       while (!file1Done && !file2Done) {
-        int value = compare(file1Bytes, length1, file1Bytes, length2);
+        int value = compare(file1Bytes, length1, file2Bytes, length2);
+        //System.out.println("");
+        //printBytes("Left compare:", file1Bytes, length1);
+        //printBytes("Right compare:", file2Bytes, length2);
+        //System.out.println("Comp value:"+value);
+
         if (value == 0) {
 
           // We are equal write both
@@ -312,6 +318,7 @@ public class ExternalFileUtil {
 
           } catch (EOFException eof) {
             // Do nothing
+            break;
           }
         }
       }
@@ -329,6 +336,7 @@ public class ExternalFileUtil {
 
           } catch (EOFException eof) {
             // Do nothing
+            break;
           }
         }
       }
@@ -373,7 +381,6 @@ public class ExternalFileUtil {
 
     return length1 - length2;
   }
-
 
   public static void partitionShards(List<File> shardHomes) throws IOException {
     //Process the shard files
@@ -432,8 +439,8 @@ public class ExternalFileUtil {
   }
 
 
-  public static String getHashDir(String customer) {
-    int bucket = customer.hashCode() % HASH_DIRS;
+  public static String getHashDir(String fileName) {
+    int bucket = fileName.hashCode() % HASH_DIRS;
     return "bucket" + bucket;
   }
 
