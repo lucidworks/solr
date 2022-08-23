@@ -414,8 +414,7 @@ public class ExternalFileUtil {
   }
 
   public static boolean refresh(ExternalFile externalFile, String outRoot) {
-    File cdir = getCustomerOutDir(outRoot, externalFile);
-    System.out.println("Customer outdir:" + cdir);
+    File cdir = getFileNameOutDir(outRoot, externalFile);
 
     if (!cdir.exists()) {
       cdir.mkdirs();
@@ -438,8 +437,8 @@ public class ExternalFileUtil {
     return "bucket" + bucket;
   }
 
-  public static File getCustomerOutDir(String outRoot, ExternalFile externalFile) {
-    return new File(new File(new File(outRoot), getHashDir(externalFile.customer)), externalFile.customer);
+  public static File getFileNameOutDir(String outRoot, ExternalFile externalFile) {
+    return new File(new File(new File(outRoot), getHashDir(externalFile.fileName)), externalFile.fileName);
   }
 
   public static DataOutputStream openShardOut(String outRoot, ExternalFile externalFile, String shardId, String fileName) throws IOException {
@@ -447,12 +446,11 @@ public class ExternalFileUtil {
   }
 
   public static File getShardHome(String outRoot, ExternalFile externalFile, String shardId) {
-    File custDir = getCustomerOutDir(outRoot, externalFile);
+    File custDir = getFileNameOutDir(outRoot, externalFile);
     File file = new File(new File(custDir, Long.toString(externalFile.timeStamp)), shardId);
     if (!file.exists()) {
       file.mkdirs();
     }
     return file;
   }
-
 }

@@ -21,14 +21,15 @@ import java.io.File;
 import java.util.Iterator;
 
 public class ExternalFile {
+
   long timeStamp;
-  String customer;
+  String fileName;
   File file;
 
-  public ExternalFile(File file, String customer, long timeStamp) {
+  public ExternalFile(File file, String fileName, long timeStamp) {
     this.file = file;
     this.timeStamp = timeStamp;
-    this.customer = customer;
+    this.fileName = fileName;
   }
 
   public static Iterator<ExternalFile> iterate(String root) {
@@ -37,28 +38,66 @@ public class ExternalFile {
 
   public static class ExternalFileIterator implements Iterator<ExternalFile> {
 
-    String[] customers = null;
-    int customerIndex = 0;
-
+    File[] topLevelDirs = null;
+    int topLevelIndex = 0;
+    File[] fileLevelDirs = null;
+    int fileLevelIndex = 0;
 
     public ExternalFileIterator(String root) {
-        File customersRoot = new File(root);
-        customers = customersRoot.list();
+        File rootDir = new File(root);
+        topLevelDirs = rootDir.listFiles();
+        fileLevelDirs = topLevelDirs[0].listFiles();
     }
 
     public boolean hasNext() {
-      if(customerIndex == 0) {
+      if(topLevelIndex < topLevelDirs.length) {
         return true;
+      } else {
+        return false;
       }
-
-      return false;
     }
 
     public ExternalFile next() {
-      ++customerIndex;
-      File file = new File("/Users/joelbernstein/tools/merge/test/customer1/pricing/1659368012/customer1.txt");
-      return new ExternalFile(file, "customer1", 121213131);
+      while(true) {
+        if (fileLevelIndex < fileLevelDirs.length) {
+          File currentFile = fileLevelDirs[fileLevelIndex];
+          ++fileLevelIndex;
+          if (fileLevelIndex == fileLevelDirs.length) {
+            ++topLevelIndex;
+            if (topLevelIndex < topLevelDirs.length) {
+              fileLevelDirs = topLevelDirs[topLevelIndex].listFiles();
+              fileLevelIndex = 0;
+            }
+          }
+          //Find the latest version of the file
+          File[] timeStamps = currentFile.listFiles();
+          File timeDir = null;
+          long time = -1;
+          for (File timeStamp : timeStamps) {
+            try {
+              long fileTime = Long.parseLong(timeStamp.getName());
+              if (fileTime > time) {
+                time = fileTime;
+                timeDir = timeStamp;
+              }
+            } catch (Exception e) {
+              //skip
+            }
+          }
+
+          if (timeDir != null) {
+            File[] targets = timeDir.listFiles();
+            if (targets.length > 0) {
+              if (targets[0].getName().endsWith(".txt")) {
+                String fileName = currentFile.getName();
+                return new ExternalFile(targets[0], fileName, time);
+              }
+            }
+          }
+        } else {
+          return null;
+        }
+      }
     }
   }
-
 }
