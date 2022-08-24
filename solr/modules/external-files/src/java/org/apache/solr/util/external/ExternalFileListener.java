@@ -48,7 +48,11 @@ public class ExternalFileListener implements SolrEventListener {
     String dataDir = newSearcher.getCore().getIndexDir();
     String newSearcherID = Integer.toHexString(newSearcher.hashCode());
     String currentSearcherID = Integer.toHexString(currentSearcher.hashCode());
-    File dataDirFile = new File(dataDir);
+    File dataDirFile = new File(new File(dataDir).getParentFile(),"external");
+
+    if(!dataDirFile.exists()) {
+      dataDirFile.mkdirs();
+    }
 
     try {
 

@@ -58,10 +58,10 @@ public class FileFloatSource2 extends ValueSource {
   private SchemaField field;
   private final SchemaField keyField;
   private final float defVal;
-  private final String dataDir;
+  private final File dataDir;
   private final File externalDir;
   private final String fileNameStripped;
-  private final String searchId;
+  private final String searcherId;
   private final String shardId;
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -79,9 +79,9 @@ public class FileFloatSource2 extends ValueSource {
     this.fileNameStripped = field.getName().replace("_ef$", "");
     this.keyField = keyField;
     this.defVal = defVal;
-    this.dataDir = dataDir;
+    this.dataDir = new File(new File(dataDir).getParentFile(), "external");
     this.externalDir = new File(externalDir);
-    this.searchId = searcherId;
+    this.searcherId = searcherId;
     this.shardId = shardId;
   }
 
@@ -281,7 +281,8 @@ public class FileFloatSource2 extends ValueSource {
 
   private static float[] getFloats(FileFloatSource2 ffs, IndexReader reader, CachedFloats cachedFloats) {
 
-    File latestExternalDir = getLatestFileDir(ffs.externalDir,
+    File latestExternalDir = getLatestFileDir(
+        ffs.externalDir,
         ffs.fileNameStripped,
         ffs.shardId,
         cachedFloats == null ? -1 : cachedFloats.loadTime);
@@ -300,7 +301,7 @@ public class FileFloatSource2 extends ValueSource {
     try {
 
       for(int i=0; i<8; i++) {
-        MergeJoin merger = new MergeJoin(new File(ffs.dataDir, ffs.searchId + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(i)), new File(latestExternalDir, "external_"+i+".bin"), vals);
+        MergeJoin merger = new MergeJoin(new File(ffs.dataDir, ffs.searcherId + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(i)), new File(latestExternalDir, ExternalFileUtil.FINAL_PARTITION_PREFIX+i), vals);
         Future<?> future = executorService.submit(merger);
         futures.add(future);
       }
