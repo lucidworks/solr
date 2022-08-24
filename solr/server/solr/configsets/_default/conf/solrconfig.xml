@@ -530,7 +530,7 @@
     <!-- QuerySenderListener takes an array of NamedList and executes a
          local query request for each NamedList in sequence.
       -->
-    <listener event="newSearcher" class="org.apache.solr.util.external.ExternalFileListener">
+    <listener event="newSearcher" class="solr.QuerySenderListener">
       <arr name="queries">
         <!--
            <lst><str name="q">solr</str><str name="sort">price asc</str></lst>
@@ -538,7 +538,7 @@
           -->
       </arr>
     </listener>
-    <listener event="firstSearcher" class="org.apache.solr.util.external.ExternalFileListener">
+    <listener event="firstSearcher" class="solr.QuerySenderListener">
       <arr name="queries">
         <!--
         <lst>
