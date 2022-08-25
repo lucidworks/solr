@@ -100,25 +100,66 @@ public class FileFloatSource2 extends ValueSource {
     return "float(" + field + ')';
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public FunctionValues getValues(Map<Object, Object> context, LeafReaderContext readerContext)
       throws IOException {
+
     log.info("FileFloatSource2.getValues()");
-    final int off = readerContext.docBase;
-    IndexReaderContext topLevelContext = ReaderUtil.getTopLevelContext(readerContext);
 
-    final float[] arr = getCachedFloats(topLevelContext.reader());
-    return new FloatDocValues(this) {
-      @Override
-      public float floatVal(int doc) {
-        return arr[doc + off];
-      }
+    float[] arr = null;
+    Object o = context.get(getClass().getName());
+    Map<String, float[]> floatMap = null;
+    if(o instanceof Map) {
 
-      @Override
-      public Object objectVal(int doc) {
-        return floatVal(doc); // TODO: keep track of missing values
+      floatMap = (Map<String, float[]>)o;
+      arr = floatMap.get(this.fileNameStripped);
+    } else {
+      floatMap = new HashMap<>();
+      context.put(getClass().getName(), floatMap);
+    }
+
+
+    if(arr == null) {
+      log.info("FileFloatSource2.getValues() from cache");
+      IndexReaderContext topLevelContext = ReaderUtil.getTopLevelContext(readerContext);
+      arr = getCachedFloats(topLevelContext.reader());
+      if(arr != null) {
+        floatMap.put(this.fileNameStripped, arr);
       }
-    };
+    }
+
+    if(arr != null) {
+
+      final float[] vals = arr;
+      final int off = readerContext.docBase;
+      return new FloatDocValues(this) {
+        @Override
+        public float floatVal(int doc) {
+          return vals[doc + off];
+        }
+
+        @Override
+        public Object objectVal(int doc) {
+          return floatVal(doc); // TODO: keep track of missing values
+        }
+      };
+
+    } else {
+
+      return new FloatDocValues(this) {
+        @Override
+        public float floatVal(int doc) {
+          return defVal;
+        }
+
+        @Override
+        public Object objectVal(int doc) {
+          return floatVal(doc); // TODO: keep track of missing values
+        }
+      };
+
+    }
   }
 
   @Override
@@ -309,6 +350,10 @@ public class FileFloatSource2 extends ValueSource {
         ffs.shardId,
         cachedFloats == null ? -1 : cachedFloats.loadTime);
 
+    if (latestExternalDir == null) {
+      return null;
+    }
+
     log.info("Got latest external file dir : {}", latestExternalDir.getAbsolutePath());
 
     ExecutorService executorService = ExecutorUtil.newMDCAwareCachedThreadPool(8, new SolrNamedThreadFactory("FileFloatSource2"));
@@ -317,20 +362,16 @@ public class FileFloatSource2 extends ValueSource {
       Arrays.fill(vals, ffs.defVal);
     }
 
-    if(latestExternalDir == null) {
-      return vals;
-    }
-
     List<Future<?>> futures = new ArrayList<>();
     try {
 
-      for(int i=0; i<8; i++) {
+      for (int i=0; i<8; i++) {
         MergeJoin merger = new MergeJoin(new File(ffs.dataDir, ffs.searcherId + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(i)), new File(latestExternalDir, ExternalFileUtil.FINAL_PARTITION_PREFIX+i), vals);
         Future<?> future = executorService.submit(merger);
         futures.add(future);
       }
 
-      for(Future<?> future : futures) {
+      for (Future<?> future : futures) {
         future.get();
       }
 
@@ -358,12 +399,14 @@ public class FileFloatSource2 extends ValueSource {
     }
 
     public void run() {
+
       DataInputStream indexIn = null;
       DataInputStream externalIn = null;
       byte[] indexIdBytes = new byte[30];
       byte[] externalIdBytes = new byte[30];
 
       try {
+
         indexIn = new DataInputStream(new BufferedInputStream(new FileInputStream(indexFile), 16384));
         externalIn = new DataInputStream(new BufferedInputStream(new FileInputStream(externalFile), 16384));
 
@@ -465,17 +508,21 @@ public class FileFloatSource2 extends ValueSource {
           }
         }
 
-        //Check if finished writing
-        log.info("Found maxFile {}", maxFile.getAbsolutePath());
-        File shardHome = new File(maxFile, shardId);
-        log.info("Shard home = {}", shardHome.getAbsolutePath());
-        File shardComplete = new File(shardHome, ExternalFileUtil.SHARD_COMPLETE_FILE);
-        log.info("Checking shard complete : {}", shardComplete.getAbsolutePath());
-        if(shardComplete.exists()) {
-          log.info("Shard complete file exists");
-          return shardHome;
+        if(maxFile != null) {
+          //Check if finished writing
+          log.info("Found maxFile {}", maxFile.getAbsolutePath());
+          File shardHome = new File(maxFile, shardId);
+          log.info("Shard home = {}", shardHome.getAbsolutePath());
+          File shardComplete = new File(shardHome, ExternalFileUtil.SHARD_COMPLETE_FILE);
+          log.info("Checking shard complete : {}", shardComplete.getAbsolutePath());
+          if (shardComplete.exists()) {
+            log.info("Shard complete file exists");
+            return shardHome;
+          } else {
+            log.info("Shard complete file does not exist");
+            return null;
+          }
         } else {
-          log.info("Shard complete file does not exist");
           return null;
         }
       }
