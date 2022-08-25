@@ -27,12 +27,16 @@ import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.function.FileFloatSource2;
 import org.apache.solr.uninverting.UninvertingReader;
 import org.apache.solr.util.RefCounted;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.Map;
 
 public class ExternalFileField2 extends FieldType implements SchemaAware {
 
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final String EXTERNAL_ROOT_PATH_VAR = "EXTERNAL_ROOT_PATH";
   private String keyFieldName;
   private IndexSchema schema;
@@ -40,6 +44,7 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
 
   @Override
   protected void init(IndexSchema schema, Map<String, String> args) {
+    log.info("Initializing ExternalFileField2");
     restrictProps(SORT_MISSING_FIRST | SORT_MISSING_LAST);
     keyFieldName = args.remove("keyField");
     String defValS = args.remove("defVal");
@@ -65,6 +70,7 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
 
   @Override
   public ValueSource getValueSource(SchemaField field, QParser parser) {
+    log.info("Getting value source for {}", field.getName());
     return getFileFloatSource(field);
   }
 
@@ -83,7 +89,11 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
       solrIndexSearcherRefCounted.decref();
     }
 
+    log.info("Get file float source for searcher {}", searcherId);
+
     String shardId = SolrRequestInfo.getRequestInfo().getReq().getCore().getCoreDescriptor().getCloudDescriptor().getShardId();
+
+    log.info("Get file float source for shard {}", shardId);
 
     return getFileFloatSource(
         field, SolrRequestInfo.getRequestInfo().getReq().getCore().getDataDir(), searcherId, shardId) ;

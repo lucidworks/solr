@@ -67,7 +67,7 @@ public class FileFloatSource2 extends ValueSource {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
-   * Creates a new FileFloatSource
+   * Creates a new FileFloatSource2
    *
    * @param field the source's SchemaField
    * @param keyField the field to use as a key
@@ -79,10 +79,20 @@ public class FileFloatSource2 extends ValueSource {
     this.fileNameStripped = field.getName().replace("_ef$", "");
     this.keyField = keyField;
     this.defVal = defVal;
-    this.dataDir = new File(new File(dataDir).getParentFile(), "external");
+    this.dataDir = new File(new File(dataDir), "external");
     this.externalDir = new File(externalDir);
     this.searcherId = searcherId;
     this.shardId = shardId;
+
+    log.info("Constructing FileFloatSource2");
+    log.info("field={}", field.getName());
+    log.info("fileNameStripped={}", fileNameStripped);
+    log.info("keyField={}", keyField.getName());
+    log.info("defVal={}", Float.toString(defVal));
+    log.info("dataDir={}", this.dataDir.getAbsolutePath());
+    log.info("externalDir={}", this.externalDir.getAbsolutePath());
+    log.info("searchId={}", searcherId);
+    log.info("shardId={}", shardId);
   }
 
   @Override
@@ -93,6 +103,7 @@ public class FileFloatSource2 extends ValueSource {
   @Override
   public FunctionValues getValues(Map<Object, Object> context, LeafReaderContext readerContext)
       throws IOException {
+    log.info("FileFloatSource2.getValues()");
     final int off = readerContext.docBase;
     IndexReaderContext topLevelContext = ReaderUtil.getTopLevelContext(readerContext);
 
@@ -161,6 +172,7 @@ public class FileFloatSource2 extends ValueSource {
   }
 
   private final float[] getCachedFloats(IndexReader reader) {
+    log.info("FileFloatSource2 Getting cached floats");
     return (float[]) floatCache.get(reader, new Entry(this));
   }
 
@@ -207,6 +219,7 @@ public class FileFloatSource2 extends ValueSource {
         } else {
           cachedFloats = (CachedFloats) value;
           if (timeStamp - cachedFloats.lastChecked > cachedFloats.ttl) {
+            // ttl has expired so force a check of the files on disk.
             value = new CreationPlaceholder();
             innerCache.put(key, value);
           }
@@ -221,17 +234,26 @@ public class FileFloatSource2 extends ValueSource {
             if(progress.value == null) {
               // Floats were not loaded
               if(cachedFloats != null) {
+                // Cached floats were loaded above and were found to be the up-to-date with disk version
+                // Reset the lastChecked.
                 cachedFloats.lastChecked = timeStamp;
+                // Return the cached floats
                 return cachedFloats.floats;
+              } else {
+                // Cached floats were not loaded possible there was no file?
+                // Remove the placeholder
+                synchronized (readerCache) {
+                  innerCache.remove(key);
+                }
+                return null;
               }
             } else {
-              // Floats were loaded
+              // Floats were loaded from the file
               CachedFloats _cachedFloats = new CachedFloats();
               _cachedFloats.floats = (float[]) progress.value;
               _cachedFloats.lastChecked = _cachedFloats.loadTime = timeStamp;
               synchronized (readerCache) {
                 innerCache.put(key, _cachedFloats);
-                onlyForTesting = progress.value;
               }
               return progress.value;
             }
@@ -287,6 +309,8 @@ public class FileFloatSource2 extends ValueSource {
         ffs.shardId,
         cachedFloats == null ? -1 : cachedFloats.loadTime);
 
+    log.info("Got latest external file dir : {}", latestExternalDir.getAbsolutePath());
+
     ExecutorService executorService = ExecutorUtil.newMDCAwareCachedThreadPool(8, new SolrNamedThreadFactory("FileFloatSource2"));
     float[] vals = new float[reader.maxDoc()];
     if (ffs.defVal != 0) {
@@ -326,6 +350,8 @@ public class FileFloatSource2 extends ValueSource {
     private final float[] vals;
 
     public MergeJoin(File indexFile, File externalFile, float[] vals) {
+      log.info("Index file join : {}", indexFile.getAbsolutePath());
+      log.info("External file join : {}", externalFile.getAbsolutePath());
       this.indexFile = indexFile;
       this.externalFile = externalFile;
       this.vals = vals;
@@ -340,39 +366,43 @@ public class FileFloatSource2 extends ValueSource {
       try {
         indexIn = new DataInputStream(new BufferedInputStream(new FileInputStream(indexFile), 16384));
         externalIn = new DataInputStream(new BufferedInputStream(new FileInputStream(externalFile), 16384));
+
         int indexIdLength = indexIn.readByte();
-        int luceneId = indexIn.readInt();
         indexIn.read(indexIdBytes, 0, indexIdLength);
+        int luceneId = indexIn.readInt();
 
         int externalIdLength = externalIn.readByte();
-        float price = externalIn.readFloat();
         externalIn.read(externalIdBytes, 0, externalIdLength);
+        float price = externalIn.readFloat();
 
         while(true) {
           int value = ExternalFileUtil.compare(indexIdBytes, indexIdLength, externalIdBytes, externalIdLength);
           if(value == 0) {
             vals[luceneId] = price;
+
             indexIdLength = indexIn.readByte();
-            luceneId = indexIn.readInt();
             indexIn.read(indexIdBytes, 0, indexIdLength);
+            luceneId = indexIn.readInt();
+
             externalIdLength = externalIn.readByte();
-            price = externalIn.readFloat();
             externalIn.read(externalIdBytes, 0, externalIdLength);
+            price = externalIn.readFloat();
           } else if (value < 1) {
             // Advance only the index
             indexIdLength = indexIn.readByte();
-            luceneId = indexIn.readInt();
             indexIn.read(indexIdBytes, 0, indexIdLength);
+            luceneId = indexIn.readInt();
           } else {
             // Advance only the external
             externalIdLength = externalIn.readByte();
-            price = externalIn.readFloat();
             externalIn.read(externalIdBytes, 0, externalIdLength);
+            price = externalIn.readFloat();
           }
         }
       } catch (EOFException f) {
         //Do nothing
       } catch (Exception e) {
+        log.error("Join error", e);
         throw new RuntimeException(e);
       } finally {
         try {
@@ -380,12 +410,12 @@ public class FileFloatSource2 extends ValueSource {
         } catch(Exception e) {
 
         }
-      }
 
-      try {
-        externalIn.close();
-      } catch(Exception e) {
+        try {
+          externalIn.close();
+        } catch(Exception e) {
 
+        }
       }
     }
   }
@@ -413,11 +443,15 @@ public class FileFloatSource2 extends ValueSource {
   public static File getLatestFileDir(File root, String fileName, String shardId, long afterTime) {
 
     File fileHome = new File(new File(root, ExternalFileUtil.getHashDir(fileName)), fileName);
+    log.info("FileFloatSource2 external file home={}", fileHome.getAbsolutePath());
     if(!fileHome.exists()) {
+      log.info("File {} does not exist", fileHome.getAbsolutePath());
       return null;
     } else {
+      log.info("Listing top level external files");
       File[] files = fileHome.listFiles();
-      if(files.length == 0) {
+      if(files == null || files.length == 0) {
+        log.info("Found no top level external files");
         return null;
       } else {
         long maxTime = -1;
@@ -432,11 +466,16 @@ public class FileFloatSource2 extends ValueSource {
         }
 
         //Check if finished writing
+        log.info("Found maxFile {}", maxFile.getAbsolutePath());
         File shardHome = new File(maxFile, shardId);
+        log.info("Shard home = {}", shardHome.getAbsolutePath());
         File shardComplete = new File(shardHome, ExternalFileUtil.SHARD_COMPLETE_FILE);
+        log.info("Checking shard complete : {}", shardComplete.getAbsolutePath());
         if(shardComplete.exists()) {
+          log.info("Shard complete file exists");
           return shardHome;
         } else {
+          log.info("Shard complete file does not exist");
           return null;
         }
       }
