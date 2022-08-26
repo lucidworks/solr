@@ -1,13 +1,13 @@
 # External Files Module
 
-The External Files Module expands upon Solr's cores ExternalFileField implementation. 
+The External Files Module expands on Solr's core ExternalFileField implementation. 
 This module's goal is to create an external file field implementation that scales to larger collections
 and supports a larger number of external files, while minimizing the impact of loading and updating of external files
 on response time.
 
 # Design
 
-The External Files Module design can be broken down into four main areas: **handing oexternal files**, 
+The External Files Module design can be broken down into four main areas: **handing external files**, 
 **handling of the index**, **loading of external files** and **caching of external files**.
 
 ## Handling of External Files
@@ -51,14 +51,60 @@ $root/bucket1/foo_en/1661540544007/foo_en.txt
 
 The format of the of text file is:
 
-key1:value1
-key2:value2
+id1:float1
+id2:float2
 
-The key must map to unique Id in Solr collection. The value must parse to a Java float.
-The keys do not need to be sorted as files will be sorted by key by the ExternalFileUtil (see below)
+OR
+
+id1:routeKey1:float1
+id2:routeKey1:float2
+
+The id must map to unique Id in Solr collection. The value must parse to a Java float. The routeKey
+must be provided if documents are routed to shards with a specific route key.
+The keys do not need to be sorted as files will be sorted by key by the ExternalFileUtil. The 
+ExternalFileUtil splits each file into separate files for each for each shard 
+(See ExternalFileUtil docs below for details.)
 
 
-### Storage and Format of Process External Files (Output)
+### Storage and Format of Processed External Files (Output)
+
+The raw external files are processed by the ExternalFileUtil (EFU) which is command line tool. The EFU creates the following
+output structure:
+
+$root/bucket[0-249]/filename/timestamp/shardId/partition_[0-7].bin
+
+
+#### Root
+
+The process external file root directory.
+
+#### Bucket
+
+250 Sub-directories with the prefix "bucket" and postfix [0-249]. Example directory: bucket1
+
+Filenames are mapped to directories by hashing the filename similar to a 250 bucket hashmap.
+
+#### Filename
+
+Each bucket will contain N filename folders. The folder names will be exactly the same as the filename
+directories in the raw files directory structure.
+
+#### timestamp
+
+The unix timestamp also taken from raw files directory structure.
+
+#### shardId
+
+The directories for shards for the collection that external files will be loaded to. For example if the
+collection has 5 shards there will 5 shardId folders. Document ids are partitioned by the 
+ExternalFileUtil using the DocRouter that is used by the collection. Currently only the hash based
+CompositeId router is supported.
+
+
+
+
+
+
 
 
 

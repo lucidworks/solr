@@ -91,8 +91,10 @@ public class ExternalFileUtil {
       while ((line = in.readLine()) != null) {
         String[] pair = line.split(":");
         String id = pair[0].trim();
-        float f = Float.parseFloat(pair[1]);
-        Slice slice = docRouter.getTargetSlice(id, null, null, null, docCollection);
+        float f = pair.length == 3 ? Float.parseFloat(pair[2].trim()) : Float.parseFloat(pair[1].trim());
+        String rid = pair.length == 3 ? pair[1].trim() : id;
+
+        Slice slice = docRouter.getTargetSlice(rid, null, null, null, docCollection);
         String shardId = slice.getName();
         if (shardOuts.containsKey(shardId)) {
           DataOutputStream shardOut = shardOuts.get(shardId);
