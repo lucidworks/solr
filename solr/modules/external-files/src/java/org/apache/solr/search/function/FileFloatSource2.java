@@ -254,8 +254,6 @@ public class FileFloatSource2 extends ValueSource {
           value = innerCache.get(key);
         }
 
-        value = null;
-
         if (value == null) {
           value = new CreationPlaceholder();
           innerCache.put(key, value);
