@@ -369,7 +369,7 @@ public class ExternalFileUtil {
     }
   }
 
-  public static int compare(byte[] left, int length1, byte[] right, int length2) {
+  public static final int compare(byte[] left, int length1, byte[] right, int length2) {
 
     for (int i = 0, j = 0; i < length1 && j < length2; i++, j++) {
       byte a = left[i];

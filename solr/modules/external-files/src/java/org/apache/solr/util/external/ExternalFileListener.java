@@ -47,7 +47,12 @@ public class ExternalFileListener implements SolrEventListener {
     DataOutputStream[] partitions = new DataOutputStream[ExternalFileUtil.NUM_PARTITIONS];
     String dataDir = newSearcher.getCore().getIndexDir();
     String newSearcherID = Integer.toHexString(newSearcher.hashCode());
-    String currentSearcherID = Integer.toHexString(currentSearcher.hashCode());
+    String currentSearcherID = null;
+
+    if(currentSearcher != null) {
+      currentSearcherID = Integer.toHexString(currentSearcher.hashCode());
+    }
+
     File dataDirFile = new File(new File(dataDir).getParentFile(),"external");
 
     if(!dataDirFile.exists()) {
@@ -94,8 +99,14 @@ public class ExternalFileListener implements SolrEventListener {
       String[] files = dataDirFile.list();
       for (String file : files) {
         if (file.contains(ExternalFileUtil.FINAL_PARTITION_PREFIX)) {
-          if (!file.startsWith(newSearcherID) && !file.startsWith(currentSearcherID)) {
-            new File(dataDirFile, file).delete();
+          if(currentSearcherID != null) {
+            if (!file.startsWith(newSearcherID) && !file.startsWith(currentSearcherID)) {
+              new File(dataDirFile, file).delete();
+            }
+          } else {
+            if (!file.startsWith(newSearcherID)) {
+              new File(dataDirFile, file).delete();
+            }
           }
         }
       }

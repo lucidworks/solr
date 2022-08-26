@@ -254,6 +254,8 @@ public class FileFloatSource2 extends ValueSource {
           value = innerCache.get(key);
         }
 
+        value = null;
+
         if (value == null) {
           value = new CreationPlaceholder();
           innerCache.put(key, value);
@@ -279,6 +281,9 @@ public class FileFloatSource2 extends ValueSource {
                 // Reset the lastChecked.
                 cachedFloats.lastChecked = timeStamp;
                 // Return the cached floats
+                synchronized (readerCache) {
+                  innerCache.put(key, cachedFloats);
+                }
                 return cachedFloats.floats;
               } else {
                 // Cached floats were not loaded possible there was no file?
@@ -362,6 +367,8 @@ public class FileFloatSource2 extends ValueSource {
       Arrays.fill(vals, ffs.defVal);
     }
 
+    long start = System.nanoTime();
+
     List<Future<?>> futures = new ArrayList<>();
     try {
 
@@ -381,6 +388,8 @@ public class FileFloatSource2 extends ValueSource {
       executorService.shutdown();;
     }
 
+    long end = System.nanoTime();
+    log.info("File load time: {}", Long.toString((end - start) / 1_000_000));
     return vals;
   }
 
@@ -430,16 +439,19 @@ public class FileFloatSource2 extends ValueSource {
             externalIdLength = externalIn.readByte();
             externalIn.read(externalIdBytes, 0, externalIdLength);
             price = externalIn.readFloat();
+
           } else if (value < 1) {
             // Advance only the index
             indexIdLength = indexIn.readByte();
             indexIn.read(indexIdBytes, 0, indexIdLength);
             luceneId = indexIn.readInt();
+
           } else {
             // Advance only the external
             externalIdLength = externalIn.readByte();
             externalIn.read(externalIdBytes, 0, externalIdLength);
             price = externalIn.readFloat();
+
           }
         }
       } catch (EOFException f) {
