@@ -5,6 +5,25 @@ This module's goal is to create an external file field implementation that scale
 and supports a larger number of external files, while minimizing the impact of loading and updating of external files
 on response time.
 
+The strategy for achieving better performance are the following:
+
+* Partitioning of external files first by shard and then a second level of partitioning within the shards.
+* Sorting the partitioned files by unique id
+* Binary formatting of partitioned files to eliminate all parsing and object creation during the load  
+* On new and first searchers, inside Solr, creating sorted partitioned binary files that reside in the index 
+  with a mapping between unique id and lucene id. Each of these index partitions match up with a partition 
+  of the external files.
+* Parallel loading of the sorted, binary, partitioned files. The loading is done through a very efficient merge
+join between the sorted, partitioned index mapping and external file partitions. A thread is allocated for
+each partition which merges an external partition with its matching internal index partition.  
+* Improved caching of internal files to support LRU eviction. This allows external file fields to be loaded and 
+  unloaded from memory to support a larger number of external file fields than can fit in memory at once. Because
+  external file fields can be loaded quickly the performance hit for reloading an evicted external file is kept
+  to a minimum.
+* Support for a configurable directory for external files. This allows external files to be mounted as a shared drive
+  on each Solr replica to avoid the need to replicate the data to each node.
+  
+
 # Design
 
 The External Files Module design can be broken down into four main areas: **handling of external files**, 
