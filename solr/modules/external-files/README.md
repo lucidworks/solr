@@ -187,11 +187,15 @@ This includes: field lists, sorting fields, collapse, facet aggregations, frange
  
 ###  Module Configuration
 
-bin/solr start -c -m 6g -Dsolr.modules=external-files -DEXTERNAL_ROOT_PATH=$external_file_root
+The external files module can be included in the Solr startup command like other Solr modules.
+The system parameter `EXTERNAL_ROOT_PATH` must also be specified. Below is an example 
+startup command which includes the external-file module and the EXTERNAL_ROOT_PATH:
+
+```bin/solr start -c -m 6g -Dsolr.modules=external-files -DEXTERNAL_ROOT_PATH=$external_file_root```
 
 ### ExternalFileUtil (EFU)
 
-The org.apache.solr.util.external.ExternalFileUtil is a command line tool used process the raw external files 
+The org.apache.solr.util.external.ExternalFileUtil is a command line tool used to process the raw external files 
 and produce the partitioned output. Syntax:
 
 ```java -cp $solr_modules_root/external-files/build/libs/\*:$solr_deployment_root/server/solr-webapp/webapp/WEB-INF/lib/\*:$solr_deployment_root/server/lib/\*:$solr_deployment_root/server/lib/ext/\* org.apache.solr.util.external.ExternalFileUtil $rawFilesRoot $outRoot $zkHost $collection```
