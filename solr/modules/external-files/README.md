@@ -34,7 +34,7 @@ many external file fields are loaded.
 # Design
 
 The External Files Module design can be broken down into four main areas: **partitioning of external files**, 
-**index extract**, **loading of external files** and **caching of external files**.
+**index extraction**, **loading of external files** and **caching of external files**.
 
 ## Partitioning of External Files
 
@@ -103,13 +103,13 @@ $root/bucket[0-249]/filename/timestamp/shardId/partition_[0-7].bin
 
 #### Root
 
-The process external file root directory.
+The processed external files root directory.
 
 #### Bucket
 
 250 Sub-directories with the prefix "bucket" and postfix [0-249]. Example directory: bucket1
 
-Filenames are mapped to directories by hashing the filename similar to a 250 bucket hashmap.
+Filenames are mapped to directories by hashing the filename similar to a hashmap.
 
 #### Filename
 
@@ -137,10 +137,26 @@ The record format of the binary files is as follows:
 N id bytes (the unique id)
 4 byte float
 
+## Index Extraction
 
+Before the first searcher and each new searcher are registered an index extraction is done to produce
+the sorted, partitioned, binary files which are used to facilitate the high performance load of the external files.
+The extracted files are written to the data directory inside of the core they are extracted from in a directory
+called *external*. The *external* directory is a sister directory of the *index* directory in the core.
 
+Inside of the external directory are files with following naming convention:
 
-## Handling of Index
+searcher_partition_[0-7]parition_number
+
+Below is sample index extraction file:
+
+6a50778b_partition_0
+
+The binary record format inside of the extract files are:
+
+1 byte length of unique id
+N bytes representing the unique id
+4 bytes representing a int lucene id
 
 
 ## Loading of the Files
