@@ -33,8 +33,8 @@ many external file fields are loaded.
 
 # Design
 
-The External Files Module design can be broken down into four main areas: **Partitioning of external files**, 
-**index extract **, **loading of external files** and **caching of external files**.
+The External Files Module design can be broken down into four main areas: **partitioning of external files**, 
+**index extract**, **loading of external files** and **caching of external files**.
 
 ## Partitioning of External Files
 
