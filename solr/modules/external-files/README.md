@@ -46,7 +46,9 @@ startup command which includes the external-file module and the EXTERNAL_ROOT_PA
 The org.apache.solr.util.external.ExternalFileUtil is a command line tool used to process the raw external files
 and produce the partitioned output. Syntax:
 
-```java -cp $solr_modules_root/external-files/build/libs/\*:$solr_deployment_root/server/solr-webapp/webapp/WEB-INF/lib/\*:$solr_deployment_root/server/lib/\*:$solr_deployment_root/server/lib/ext/\* org.apache.solr.util.external.ExternalFileUtil $rawFilesRoot $outRoot $zkHost $collection```
+```
+java -cp $solr_modules_root/external-files/build/libs/\*:$solr_deployment_root/server/solr-webapp/webapp/WEB-INF/lib/\*:$solr_deployment_root/server/lib/\*:$solr_deployment_root/server/lib/ext/\* org.apache.solr.util.external.ExternalFileUtil $rawFilesRoot $outRoot $zkHost $collection
+```
 
 ## ExternalFileListener
 
