@@ -139,23 +139,25 @@ N id bytes (the unique id)
 
 ## Index Extraction
 
-Before the first searcher and each new searcher are registered an index extraction is done to produce
+>Before the first searcher and each new searcher are registered an index extraction is done to produce
 the sorted, partitioned, binary files which are used to facilitate the high performance load of the external files.
 The extracted files are written to the data directory inside of the core they are extracted from in a directory
 called *external*. The *external* directory is a sister directory of the *index* directory in the core.
-
-Inside of the external directory are files with following naming convention:
-
-searcher_partition_[0-7]parition_number
-
-Below is sample index extraction file:
-
-6a50778b_partition_0
-
-The binary record format inside of the extract files are:
+>
+>Inside of the external directory are files with following naming convention:
+>
+>searcher_partition_[0-7]parition_number
+>
+>Below is sample index extraction file:
+>
+>6a50778b_partition_0
+>
+>The binary record format inside of the extract files are:
 
 1 byte length of unique id
+
 N bytes representing the unique id
+
 4 bytes representing a int lucene id
 
 
