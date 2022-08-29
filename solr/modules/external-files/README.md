@@ -214,18 +214,26 @@ follows:
   ```
 
 
-### ExternalFileField2 and FileFloatSource2
+### ExternalFileField2 
 
-The easiest way to configure the ...
-
-```
-<dynamicField name="*_ef"  type="external_float"     indexed="false"  stored="false"/>
-
-```
+The ExternalFileField2 field type is configured in the managed-schema.xml file as follows:
 
 ```
 <fieldType name="external_float" defVal="0" stored="false" indexed="false" class="org.apache.solr.schema.ExternalFileField2"/>
 ```
+
+Below is an example of a dynamic field configured to the field type:
+
+```
+<dynamicField name="*_ef"  type="external_float"     indexed="false"  stored="false"/>
+```
+
+Once configured the `field` function query can be used to access the external float in any part of Solr that
+accepts function queries. A sample call would look like this: `field(customer1_ef)`. In this example
+the `customer1_ef` name would map to FILENAME directory in the external file root path:
+
+$root/bucket[0-249]/**filename**/timestamp/shardId/partition_[0-7].bin
+
 
 ### 
 
