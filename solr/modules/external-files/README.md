@@ -218,6 +218,14 @@ follows:
 
 The easiest way to configure the ...
 
+```
+<dynamicField name="*_ef"  type="external_float"     indexed="false"  stored="false"/>
+
+```
+
+```
+<fieldType name="external_float" defVal="0" stored="false" indexed="false" class="org.apache.solr.schema.ExternalFileField2"/>
+```
 
 ### 
 
