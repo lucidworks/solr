@@ -161,6 +161,24 @@ N bytes representing the unique id
 
 ## Loading of the Files
 
+The loading of the processed partitioned files is handled by the new ExternalFileField2 (field type) 
+and FileFloatSource2 classes. The external files are loaded lazily upon request of any a schema field 
+that is mapped the ExternalFileField2 field type. The FileFloatSource2 class performs the following steps
+to load the files:
+
+* Locates the latest timestamp directory for the file name requested. For example if field name 
+*customer1_ef* is requested it will locate the latest timestamp inside external file directory tree: 
+
+$root/bucket[0-249]/filename/timestamp
+
+* Locates the shardId directory inside the timestamp directory that matches the core's SolrCloud shardId.
+
+* Using a thread per partition, it merge joins the external partitions with the corresponding index extract partition
+and loads the floats into the array.
+  
+* Once loaded and cached the floats are mapped to lucene ids and can be used anywhere a function query can be used.
+This includes: field lists, sorting fields, collapse, facet aggregations, frange filter queries, facet queries (frange filter queries)
+
 
 ## Caching of the Files
 
