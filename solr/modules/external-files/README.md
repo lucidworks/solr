@@ -29,9 +29,64 @@ repeated seeks into the Lucene index to match up the lucene id with a specific f
 has limited effect on this because it must still perform seeks for each unique id in the file, and a miss is 
 almost as expensive as a hit. There is no LRU cache so all memory can quickly fill up if 
 many external file fields are loaded.
-  
 
-# Design
+
+# Getting Started
+
+##  Including the Module
+
+The external files module can be included in the Solr startup command like other Solr modules.
+The system parameter `EXTERNAL_ROOT_PATH` must also be specified. Below is an example
+startup command which includes the external-file module and the EXTERNAL_ROOT_PATH:
+
+```bin/solr start -c -m 6g -Dsolr.modules=external-files -DEXTERNAL_ROOT_PATH=$external_file_root```
+
+## ExternalFileUtil (EFU)
+
+The org.apache.solr.util.external.ExternalFileUtil is a command line tool used to process the raw external files
+and produce the partitioned output. Syntax:
+
+```java -cp $solr_modules_root/external-files/build/libs/\*:$solr_deployment_root/server/solr-webapp/webapp/WEB-INF/lib/\*:$solr_deployment_root/server/lib/\*:$solr_deployment_root/server/lib/ext/\* org.apache.solr.util.external.ExternalFileUtil $rawFilesRoot $outRoot $zkHost $collection```
+
+## ExternalFileListener
+
+The ExternalFileListener is a Solr event listener that creates the partitioned index files, used during
+the external file load, after
+each new searcher and first searcher. The ExternalFileListener is configured in the solrconfig.xml as
+follows:
+
+ ``` 
+  <listener event="newSearcher" class="org.apache.solr.util.external.ExternalFileListener">
+      
+  </listener>
+  <listener event="firstSearcher" class="org.apache.solr.util.external.ExternalFileListener">
+      
+  </listener>
+  ```
+
+
+## ExternalFileField2
+
+The ExternalFileField2 field type is configured in the managed-schema.xml file as follows:
+
+```
+<fieldType name="external_float" defVal="0" stored="false" indexed="false" class="org.apache.solr.schema.ExternalFileField2"/>
+```
+
+Below is an example of a dynamic field configured to the field type:
+
+```
+<dynamicField name="*_ef"  type="external_float"     indexed="false"  stored="false"/>
+```
+
+Once configured the `field` function query can be used to access the external float in any part of Solr that
+accepts function queries. A sample call would look like this: `field(customer1_ef)`. In this example
+the `customer1_ef` name would map to FILENAME directory in the external file root path:
+
+$root/bucket[0-249]/**filename**/timestamp/shardId/partition_[0-7].bin
+
+
+# How it Works
 
 The External Files Module design can be broken down into four main areas: **partitioning of external files**, 
 **index extraction**, **loading of external files** and **caching of external files**.
@@ -183,60 +238,6 @@ This includes: field lists, sorting fields, collapse, facet aggregations, frange
 ## Caching of the Files
 
 
-## Software Components
- 
-###  Module Configuration
-
-The external files module can be included in the Solr startup command like other Solr modules.
-The system parameter `EXTERNAL_ROOT_PATH` must also be specified. Below is an example 
-startup command which includes the external-file module and the EXTERNAL_ROOT_PATH:
-
-```bin/solr start -c -m 6g -Dsolr.modules=external-files -DEXTERNAL_ROOT_PATH=$external_file_root```
-
-### ExternalFileUtil (EFU)
-
-The org.apache.solr.util.external.ExternalFileUtil is a command line tool used to process the raw external files 
-and produce the partitioned output. Syntax:
-
-```java -cp $solr_modules_root/external-files/build/libs/\*:$solr_deployment_root/server/solr-webapp/webapp/WEB-INF/lib/\*:$solr_deployment_root/server/lib/\*:$solr_deployment_root/server/lib/ext/\* org.apache.solr.util.external.ExternalFileUtil $rawFilesRoot $outRoot $zkHost $collection```
-
-
-### ExternalFileListener
-
-The ExternalFileListener is a Solr event listener that creates the partitioned index files, used during 
-the external file load, after
-each new searcher and first searcher. The ExternalFileListener is configured in the solrconfig.xml as 
-follows:
-
- ``` 
-  <listener event="newSearcher" class="org.apache.solr.util.external.ExternalFileListener">
-      
-  </listener>
-  <listener event="firstSearcher" class="org.apache.solr.util.external.ExternalFileListener">
-      
-  </listener>
-  ```
-
-
-### ExternalFileField2 
-
-The ExternalFileField2 field type is configured in the managed-schema.xml file as follows:
-
-```
-<fieldType name="external_float" defVal="0" stored="false" indexed="false" class="org.apache.solr.schema.ExternalFileField2"/>
-```
-
-Below is an example of a dynamic field configured to the field type:
-
-```
-<dynamicField name="*_ef"  type="external_float"     indexed="false"  stored="false"/>
-```
-
-Once configured the `field` function query can be used to access the external float in any part of Solr that
-accepts function queries. A sample call would look like this: `field(customer1_ef)`. In this example
-the `customer1_ef` name would map to FILENAME directory in the external file root path:
-
-$root/bucket[0-249]/**filename**/timestamp/shardId/partition_[0-7].bin
 
  
 
