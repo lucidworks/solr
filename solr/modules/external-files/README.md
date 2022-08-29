@@ -5,7 +5,7 @@ This module's goal is to create an external file field implementation that scale
 and supports a larger number of external files, while minimizing the impact of loading and updating of external files
 on response time.
 
-The strategy for achieving better performance are the following:
+The strategy for achieving better performance includes the following:
 
 * Partitioning of external files first by shard and then a second level of partitioning within the shards.
 * Sorting the partitioned files by unique id
@@ -16,8 +16,8 @@ The strategy for achieving better performance are the following:
 * Parallel loading of the sorted, binary, partitioned files. The loading is done through a very efficient merge
 join between the sorted, partitioned index files and external file partitions. A thread is allocated for
 each partition which merges an external partition with its matching internal index partition.  
-* Improved caching of internal files to support LRU eviction. This allows external file fields to be loaded and 
-  unloaded from memory to support a larger number of external file fields than can fit in memory at once. Because
+* Improved caching of internal files to include LRU eviction. This allows external file fields to be loaded and 
+  unloaded from memory to support a larger number of external file fields. Because
   external file fields can be loaded quickly the performance hit for reloading an evicted external file is kept
   to a minimum.
 * Support for a configurable directory for external files. This allows external files to be mounted as a shared drive
@@ -26,22 +26,24 @@ each partition which merges an external partition with its matching internal ind
 It's useful to contrast this design with the external file field design in Solr core. The design in Solr core
 uses a monolithic text file which is optionally sorted. The entire file is loaded in a single thread by 
 repeated seeks into the Lucene index to match up the lucene id with a specific float from the file. Sharding 
-has limited effect on this because it must still perform seeks for each unique id in the file and a miss is 
-almost as expensive as a hit. There is no LRU cache so all of memory can quickly fill up if 
-a large number of external file fields are loaded.
+has limited effect on this because it must still perform seeks for each unique id in the file, and a miss is 
+almost as expensive as a hit. There is no LRU cache so all memory can quickly fill up if 
+many external file fields are loaded.
   
 
 # Design
 
-The External Files Module design can be broken down into four main areas: **handling of external files**, 
-**handling of the index**, **loading of external files** and **caching of external files**.
+The External Files Module design can be broken down into four main areas: **Partitioning of external files**, 
+**index extract **, **loading of external files** and **caching of external files**.
 
-## Handling of External Files
+## Partitioning of External Files
 
+The ExternalFileUtil (EFU) was developed to process the raw external texts into sorted, partitioned, binary
+files. Below is a description of the inputs and outputs of the EFU.
 
-### Storage and Format of Raw External Files (Input)
+### Storage and Format of Raw External Files (Unpartitioned Input)
 
-The raw external files will stored in the following directory structure:
+The raw external files are stored in the following directory structure:
 
 EXTERNAL_FILES_ROOT / N_TOP_LEVEL_SUBDIRS / FILENAME / TIMESTAMP / FILE
 
