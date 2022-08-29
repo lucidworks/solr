@@ -17,6 +17,7 @@
 
 package org.apache.solr.util.external;
 
+import org.apache.lucene.util.BytesRef;
 import org.apache.solr.client.solrj.impl.CloudLegacySolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.common.cloud.DocCollection;
@@ -26,6 +27,8 @@ import org.apache.solr.common.util.Hash;
 
 import java.io.*;
 import java.util.*;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
 
 public class ExternalFileUtil {
 
@@ -216,9 +219,9 @@ public class ExternalFileUtil {
   }
 
   public static File merge(File file1, File file2, int mergeCount) throws IOException {
-    System.out.println("Merging:"+file1.getName()+" : "+file2.getName());
-    byte[] file1Bytes = new byte[127];
-    byte[] file2Bytes = new byte[127];
+
+    final byte[] file1Bytes = new byte[127];
+    final byte[] file2Bytes = new byte[127];
 
     DataInputStream file1In = null;
     DataInputStream file2In = null;
@@ -226,6 +229,7 @@ public class ExternalFileUtil {
     File mergeFile = new File(file1.getParentFile(), MERGE_FILE_PREFIX + Integer.toString(mergeCount));
 
     try {
+
       mergeOut = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(mergeFile)));
       file1In = new DataInputStream(new BufferedInputStream(new FileInputStream(file1), 50000));
       file2In = new DataInputStream(new BufferedInputStream(new FileInputStream(file2), 50000));
@@ -276,7 +280,7 @@ public class ExternalFileUtil {
             file2Done = true;
           }
 
-        } else if (value < 1) {
+        } else if (value < 0) {
           // Write and advance file1
           mergeOut.writeByte(length1);
           mergeOut.write(file1Bytes, 0, length1);
@@ -371,11 +375,22 @@ public class ExternalFileUtil {
     }
   }
 
-  public static final int compare(byte[] left, int length1, byte[] right, int length2) {
+  /*
+  * Performs unsigned byte lexical comparison
+   */
+  public static final int compare(final byte[] left,
+                                  final int length1,
+                                  final byte[] right,
+                                  final int length2) {
 
-    for (int i = 0, j = 0; i < length1 && j < length2; i++, j++) {
-      byte a = left[i];
-      byte b = right[j];
+    final int minLength = length1 < length2 ? length1 : length2;
+
+    int a;
+    int b;
+
+    for (int i = 0; i < minLength; ++i) {
+      a = left[i] & 0xff;
+      b = right[i] & 0xff;
       if (a != b) {
         return a - b;
       }

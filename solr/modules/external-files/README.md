@@ -7,7 +7,7 @@ on response time.
 
 # Design
 
-The External Files Module design can be broken down into four main areas: **handing external files**, 
+The External Files Module design can be broken down into four main areas: **handling of external files**, 
 **handling of the index**, **loading of external files** and **caching of external files**.
 
 ## Handling of External Files
@@ -17,7 +17,7 @@ The External Files Module design can be broken down into four main areas: **hand
 
 The raw external files will stored in the following directory structure:
 
-**EXTERNAL_FILES_ROOT** / **N_TOP_LEVEL_SUBDIRS** / **FILENAME** / **TIMESTAMP** / **FILE**
+EXTERNAL_FILES_ROOT / N_TOP_LEVEL_SUBDIRS / FILENAME / TIMESTAMP / FILE
 
 #### EXTERNAL FILES ROOT: 
 
@@ -59,17 +59,16 @@ OR
 id1:routeKey1:float1
 id2:routeKey1:float2
 
-The id must map to unique Id in Solr collection. The value must parse to a Java float. The routeKey
-must be provided if documents are routed to shards with a specific route key.
-The keys do not need to be sorted as files will be sorted by key by the ExternalFileUtil. The 
-ExternalFileUtil splits each file into separate files for each for each shard 
-(See ExternalFileUtil docs below for details.)
+The id must map to a unique Id in a Solr collection. The value must parse to a Java float. The routeKey
+must be provided if documents are routed to shards with a specific route key. ExternalFileUtil splits
+each file into separate files for each shard. The ids do not need to be sorted as files will be sorted by 
+id by the ExternalFileUtil. The (See ExternalFileUtil docs below for details.)
 
 
 ### Storage and Format of Processed External Files (Output)
 
-The raw external files are processed by the ExternalFileUtil (EFU) which is command line tool. The EFU creates the following
-output structure:
+The raw external files are processed by the ExternalFileUtil (EFU) which is command line tool. 
+The EFU creates the following output structure:
 
 $root/bucket[0-249]/filename/timestamp/shardId/partition_[0-7].bin
 
@@ -98,14 +97,17 @@ The unix timestamp also taken from raw files directory structure.
 The directories for shards for the collection that external files will be loaded to. For example if the
 collection has 5 shards there will 5 shardId folders. Document ids are partitioned by the 
 ExternalFileUtil using the DocRouter that is used by the collection. Currently only the hash based
-CompositeId router is supported.
+CompositeId router is supported with support for id and shardKey routing.
 
+#### partitions
 
+Within each shardId directory are 8 sorted, binary partition files. Sample file name: partition_0.bin. 
+The partitions are created by hashing the id of the document and mapping to one of 8 partitions. 
+The record format of the binary files is as follows:
 
-
-
-
-
+1 byte length of id bytes
+N id bytes (the unique id)
+4 byte float
 
 
 

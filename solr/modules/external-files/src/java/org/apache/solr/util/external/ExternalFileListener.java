@@ -30,6 +30,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.lang.invoke.MethodHandles;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
 
 public class ExternalFileListener implements SolrEventListener {
 
@@ -75,7 +77,7 @@ public class ExternalFileListener implements SolrEventListener {
           int hash = ExternalFileUtil.hashCode(bytesRef.bytes, bytesRef.offset, bytesRef.length);
           int bucket = Math.abs(hash) % partitions.length;
           if (partitions[bucket] == null) {
-            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDirFile, newSearcherID + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(bucket)))));
+            partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDirFile, newSearcherID + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(bucket))), 50000));
           }
           partitions[bucket].writeByte(bytesRef.length);
           partitions[bucket].write(bytesRef.bytes, bytesRef.offset, bytesRef.length);

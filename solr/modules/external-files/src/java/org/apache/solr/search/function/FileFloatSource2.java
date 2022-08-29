@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.solr.search.function;
 
 import java.io.IOException;
@@ -105,7 +106,7 @@ public class FileFloatSource2 extends ValueSource {
   public FunctionValues getValues(Map<Object, Object> context, LeafReaderContext readerContext)
       throws IOException {
 
-    log.info("FileFloatSource2.getValues()");
+    //log.info("FileFloatSource2.getValues()");
 
     float[] arr = null;
     Object o = context.get(getClass().getName());
@@ -370,8 +371,10 @@ public class FileFloatSource2 extends ValueSource {
     List<Future<?>> futures = new ArrayList<>();
     try {
 
+      String externalFileBase = ffs.searcherId + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX;
+
       for (int i=0; i<8; i++) {
-        MergeJoin merger = new MergeJoin(new File(ffs.dataDir, ffs.searcherId + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(i)), new File(latestExternalDir, ExternalFileUtil.FINAL_PARTITION_PREFIX+i), vals);
+        MergeJoin merger = new MergeJoin(new File(ffs.dataDir, externalFileBase + i), new File(latestExternalDir, ExternalFileUtil.FINAL_PARTITION_PREFIX+i), vals);
         Future<?> future = executorService.submit(merger);
         futures.add(future);
       }
@@ -391,31 +394,37 @@ public class FileFloatSource2 extends ValueSource {
     return vals;
   }
 
-  public static class MergeJoin implements Runnable {
+  public static final class MergeJoin implements Runnable {
 
     private final File indexFile;
     private final File externalFile;
     private final float[] vals;
 
     public MergeJoin(File indexFile, File externalFile, float[] vals) {
-      log.info("Index file join : {}", indexFile.getAbsolutePath());
-      log.info("External file join : {}", externalFile.getAbsolutePath());
       this.indexFile = indexFile;
       this.externalFile = externalFile;
       this.vals = vals;
+    }
+
+    private String toString(byte[] bytes, int length) {
+      StringBuffer buf = new StringBuffer();
+      for(int i=0; i<length; i++) {
+        buf.append((char)bytes[i]);
+      }
+      return buf.toString();
     }
 
     public void run() {
 
       DataInputStream indexIn = null;
       DataInputStream externalIn = null;
-      byte[] indexIdBytes = new byte[30];
-      byte[] externalIdBytes = new byte[30];
+      final byte[] indexIdBytes = new byte[127];
+      final byte[] externalIdBytes = new byte[127];
 
       try {
 
-        indexIn = new DataInputStream(new BufferedInputStream(new FileInputStream(indexFile), 16384));
-        externalIn = new DataInputStream(new BufferedInputStream(new FileInputStream(externalFile), 16384));
+        indexIn = new DataInputStream(new BufferedInputStream(new FileInputStream(indexFile), 131_072));
+        externalIn = new DataInputStream(new BufferedInputStream(new FileInputStream(externalFile), 131_072));
 
         int indexIdLength = indexIn.readByte();
         indexIn.read(indexIdBytes, 0, indexIdLength);
@@ -423,12 +432,15 @@ public class FileFloatSource2 extends ValueSource {
 
         int externalIdLength = externalIn.readByte();
         externalIn.read(externalIdBytes, 0, externalIdLength);
-        float price = externalIn.readFloat();
+        float fval = externalIn.readFloat();
 
-        while(true) {
+        while (true) {
+
           int value = ExternalFileUtil.compare(indexIdBytes, indexIdLength, externalIdBytes, externalIdLength);
-          if(value == 0) {
-            vals[luceneId] = price;
+
+          if (value == 0) {
+
+            vals[luceneId] = fval;
 
             indexIdLength = indexIn.readByte();
             indexIn.read(indexIdBytes, 0, indexIdLength);
@@ -436,9 +448,9 @@ public class FileFloatSource2 extends ValueSource {
 
             externalIdLength = externalIn.readByte();
             externalIn.read(externalIdBytes, 0, externalIdLength);
-            price = externalIn.readFloat();
+            fval = externalIn.readFloat();
 
-          } else if (value < 1) {
+          } else if (value < 0) {
             // Advance only the index
             indexIdLength = indexIn.readByte();
             indexIn.read(indexIdBytes, 0, indexIdLength);
@@ -448,7 +460,7 @@ public class FileFloatSource2 extends ValueSource {
             // Advance only the external
             externalIdLength = externalIn.readByte();
             externalIn.read(externalIdBytes, 0, externalIdLength);
-            price = externalIn.readFloat();
+            fval = externalIn.readFloat();
 
           }
         }
@@ -496,15 +508,11 @@ public class FileFloatSource2 extends ValueSource {
   public static File getLatestFileDir(File root, String fileName, String shardId, long afterTime) {
 
     File fileHome = new File(new File(root, ExternalFileUtil.getHashDir(fileName)), fileName);
-    log.info("FileFloatSource2 external file home={}", fileHome.getAbsolutePath());
     if(!fileHome.exists()) {
-      log.info("File {} does not exist", fileHome.getAbsolutePath());
       return null;
     } else {
-      log.info("Listing top level external files");
       File[] files = fileHome.listFiles();
       if(files == null || files.length == 0) {
-        log.info("Found no top level external files");
         return null;
       } else {
         long maxTime = -1;
@@ -520,16 +528,11 @@ public class FileFloatSource2 extends ValueSource {
 
         if(maxFile != null) {
           //Check if finished writing
-          log.info("Found maxFile {}", maxFile.getAbsolutePath());
           File shardHome = new File(maxFile, shardId);
-          log.info("Shard home = {}", shardHome.getAbsolutePath());
           File shardComplete = new File(shardHome, ExternalFileUtil.SHARD_COMPLETE_FILE);
-          log.info("Checking shard complete : {}", shardComplete.getAbsolutePath());
           if (shardComplete.exists()) {
-            log.info("Shard complete file exists");
             return shardHome;
           } else {
-            log.info("Shard complete file does not exist");
             return null;
           }
         } else {
