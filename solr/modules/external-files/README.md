@@ -186,12 +186,21 @@ This includes: field lists, sorting fields, collapse, facet aggregations, frange
 ## Software Components
  
 
-### ExternalFileUtil
+### ExternalFileUtil (EFU)
+
+The org.apache.solr.util.external.ExternalFileUtil is a command line tool used process the raw external files 
+and produce the partitioned output. Syntax:
+
+java -cp $solr_modules_root/external-files/build/libs/\*:$solr_deployment_root/server/solr-webapp/webapp/WEB-INF/lib/\*:$solr_deployment_root/server/lib/\*:$solr_deployment_root/server/lib/ext/\* org.apache.solr.util.external.ExternalFileUtil $rawFilesRoot $outRoot $zkHost $collection
+
+
+
 
 
 ### ExternalFileListener
 
 
 ### ExternalFileField2 and FileFloatSource2
+
 
 # Setup
