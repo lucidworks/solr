@@ -9,12 +9,12 @@ The strategy for achieving better performance are the following:
 
 * Partitioning of external files first by shard and then a second level of partitioning within the shards.
 * Sorting the partitioned files by unique id
-* Binary formatting of partitioned files to eliminate all parsing and object creation during the load  
-* On new and first searchers, inside Solr, creating sorted partitioned binary files that reside in the index 
+* Binary formatting of partitioned files to eliminate all parsing and object creation overhead during the load  
+* On new and first searchers, inside Solr, sorted partitioned binary files are created that reside in the index 
   with a mapping between unique id and lucene id. Each of these index partitions match up with a partition 
   of the external files.
 * Parallel loading of the sorted, binary, partitioned files. The loading is done through a very efficient merge
-join between the sorted, partitioned index mapping and external file partitions. A thread is allocated for
+join between the sorted, partitioned index files and external file partitions. A thread is allocated for
 each partition which merges an external partition with its matching internal index partition.  
 * Improved caching of internal files to support LRU eviction. This allows external file fields to be loaded and 
   unloaded from memory to support a larger number of external file fields than can fit in memory at once. Because
@@ -22,6 +22,13 @@ each partition which merges an external partition with its matching internal ind
   to a minimum.
 * Support for a configurable directory for external files. This allows external files to be mounted as a shared drive
   on each Solr replica to avoid the need to replicate the data to each node.
+  
+It's useful to contrast this design with the external file field design in Solr core. The design in Solr core
+uses a monolithic text file which is optionally sorted. The entire file is loaded in a single thread by 
+repeated seeks into the Lucene index to match up the lucene id with a specific float from the file. Sharding 
+has limited effect on this because it must still perform seeks for each unique id in the file and a miss is 
+almost as expensive as a hit. There is no LRU cache so all of memory can quickly fill up if 
+a large number of external file fields are loaded.
   
 
 # Design
