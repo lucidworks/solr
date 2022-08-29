@@ -185,6 +185,9 @@ This includes: field lists, sorting fields, collapse, facet aggregations, frange
 
 ## Software Components
  
+###  Module Configuration
+
+bin/solr start -c -m 6g -Dsolr.modules=external-files -DEXTERNAL_ROOT_PATH=$external_file_root
 
 ### ExternalFileUtil (EFU)
 
@@ -194,13 +197,27 @@ and produce the partitioned output. Syntax:
 java -cp $solr_modules_root/external-files/build/libs/\*:$solr_deployment_root/server/solr-webapp/webapp/WEB-INF/lib/\*:$solr_deployment_root/server/lib/\*:$solr_deployment_root/server/lib/ext/\* org.apache.solr.util.external.ExternalFileUtil $rawFilesRoot $outRoot $zkHost $collection
 
 
-
-
-
 ### ExternalFileListener
+
+The ExternalFileListener is a Solr event listener that creates the partitioned index files, used during 
+the external file load, after
+each new searcher and first searcher. The ExternalFileListener is configured in the solrconfig.xml as 
+follows:
+
+  ``` 
+  <listener event="newSearcher" class="org.apache.solr.util.external.ExternalFileListener">
+      
+  </listener>
+  <listener event="firstSearcher" class="org.apache.solr.util.external.ExternalFileListener">
+      
+  </listener>
+  ```
 
 
 ### ExternalFileField2 and FileFloatSource2
 
+The easiest way to configure the ...
 
-# Setup
+
+### 
+
