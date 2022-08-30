@@ -5,7 +5,7 @@ This module's goal is to create an external file field implementation that scale
 and supports a larger number of external files, while minimizing the impact of loading and updating of external files
 on response time.
 
-The strategy for achieving better performance includes the following:
+The strategy for achieving better performance and scalability is the following:
 
 * Partitioning of external files first by shard and then a second level of partitioning within the shards.
 * Sorting the partitioned files by unique id
