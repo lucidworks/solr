@@ -1,6 +1,6 @@
 # External Files Module
 
-The External Files Module expands on Solr's core ExternalFileField implementation. 
+The External Files Module expands on Solr's original ExternalFileField implementation. 
 This module's goal is to create an external file field implementation that scales to larger collections
 and supports a larger number of external files, while minimizing the impact of loading and updating of external files
 on response time.
