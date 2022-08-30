@@ -44,16 +44,22 @@ startup command which includes the external-file module and the `EXTERNAL_ROOT_P
 ## ExternalFileUtil (EFU)
 
 The org.apache.solr.util.external.ExternalFileUtil is a command line tool used to process the raw external files
-and produce the partitioned output. Syntax:
+and produce the partitioned output. 
+
+Syntax:
 
 ```
 java -cp ${solr_modules_root}/external-files/build/libs/*:${solr_deployment_root}/server/solr-webapp/webapp/WEB-INF/lib/*:${solr_deployment_root}/server/lib/*:${solr_deployment_root}/server/lib/ext/* org.apache.solr.util.external.ExternalFileUtil ${rawFilesRoot} ${outRoot} ${zkHost} ${collection}
 ```
 
+The EFU will walk the raw files root dir looking for newly added external files. It compares timestamp directories for each
+file to determine if a new version of a file is available. It will process all new files and emit partitioned, binary files
+to the output directory. The format of the input and output are described in sections below.
+
+
 ## ExternalFileListener
 
-The ExternalFileListener is a Solr event listener that creates the partitioned index files, used during
-the external file load, after
+The ExternalFileListener is a Solr event listener that creates the partitioned index files after
 each new searcher and first searcher. The ExternalFileListener is configured in the solrconfig.xml as
 follows:
 
