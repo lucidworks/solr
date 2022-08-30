@@ -35,6 +35,7 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.cloud.SolrCloudTestCase;
 
+import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.request.SolrQueryRequest;
@@ -100,11 +101,9 @@ public class ExternalFileTest extends SolrCloudTestCase {
       String fl = pair.getValue().toString();
       updateRequest.add(id, fl);
     }
+
     updateRequest.commit(cluster.getSolrClient(), COLLECTIONORALIAS);
-
     String zkHost = cluster.getZkClient().getZkServerAddress();
-
-    //Write those same id's to
 
     //Construct the expected raw directories
     File rawDirRoot = new File(cluster.getBaseDir().toFile(), "raw");
@@ -129,18 +128,20 @@ public class ExternalFileTest extends SolrCloudTestCase {
     String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS};
     ExternalFileUtil.main(args);
 
-
-    SolrParams params = params();
+    SolrParams params = params("q", "*:*", "rows", "250", "fl", "id,test_f,field(test_f)");
     SolrClient client = cluster.getSolrClient();
     QueryRequest request = new QueryRequest(params);
     QueryResponse response = request.process(client, COLLECTIONORALIAS);
     SolrDocumentList documentList = response.getResults();
+    assertEquals(documentList.getNumFound(), pairs.size());
 
-    //Query for the external file field.
-
-    assert(false);
-
-
-
+    for(int i=0; i < documentList.size(); i++) {
+      SolrDocument document = documentList.get(i);
+      String id = (String)document.getFieldValue("id");
+      float f1 = (float)document.getFieldValue("test_f");
+      float f2 = (float)document.getFieldValue("field(test_f)");
+      assertEquals(pairs.get(id), f1, 0);
+      assertEquals(f1, f2, 0.0);
+    }
   }
 }
