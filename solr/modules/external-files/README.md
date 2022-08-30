@@ -37,7 +37,7 @@ many external file fields are loaded.
 
 The external files module can be included in the Solr startup command like other Solr modules.
 The system parameter `EXTERNAL_ROOT_PATH` must also be specified. Below is an example
-startup command which includes the external-file module and the EXTERNAL_ROOT_PATH:
+startup command which includes the external-file module and the `EXTERNAL_ROOT_PATH`:
 
 ```bin/solr start -c -m 6g -Dsolr.modules=external-files -DEXTERNAL_ROOT_PATH=$external_file_root```
 
