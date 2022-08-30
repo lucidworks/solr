@@ -28,7 +28,6 @@ import org.apache.lucene.tests.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 
 import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -38,9 +37,7 @@ import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.util.external.ExternalFileUtil;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -62,6 +59,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
 
     String collection;
     useAlias = random().nextBoolean();
+    useAlias = false;
     if (useAlias) {
       collection = COLLECTIONORALIAS + "_collection";
     } else {
@@ -99,7 +97,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
     for(Map.Entry<String, Float> pair : pairs.entrySet()) {
       String id = pair.getKey();
       String fl = pair.getValue().toString();
-      updateRequest.add(id, fl);
+      updateRequest.add("id", id, "test_f", fl);
     }
 
     updateRequest.commit(cluster.getSolrClient(), COLLECTIONORALIAS);
@@ -107,7 +105,9 @@ public class ExternalFileTest extends SolrCloudTestCase {
 
     //Construct the expected raw directories
     File rawDirRoot = new File(cluster.getBaseDir().toFile(), "raw");
-    File dataFile = new File(new File(new File(new File(rawDirRoot, "bucket1"), "test_ef"), String.valueOf(System.currentTimeMillis())),"test_ef.txt");
+    File dataDir = new File(new File(new File(rawDirRoot, "bucket1"), "test_ef"), String.valueOf(System.currentTimeMillis()));
+    dataDir.mkdirs();
+    File dataFile = new File(dataDir, "test_ef.txt");
     PrintWriter out = new PrintWriter(new FileWriter(dataFile));
     try {
       for(Map.Entry<String, Float> pair : pairs.entrySet()) {
@@ -143,5 +143,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
       assertEquals(pairs.get(id), f1, 0);
       assertEquals(f1, f2, 0.0);
     }
+
+    System.out.println("########### Done!");
   }
 }
