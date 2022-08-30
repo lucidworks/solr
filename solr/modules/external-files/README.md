@@ -166,7 +166,7 @@ id by the ExternalFileUtil.
 
 ### Storage and Format of Processed External Files (Output)
 
-The raw external files are processed by the ExternalFileUtil (EFU) which is command line tool. 
+The raw external files are processed by the ExternalFileUtil (EFU) which is a command line tool. 
 The EFU creates the following output structure:
 
 ${root}/bucket[0-249]/filename/timestamp/shardId/partition_[0-7].bin
