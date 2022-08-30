@@ -7,10 +7,11 @@ on response time.
 
 The strategy for achieving better performance and scalability is the following:
 
-* Partitioning of external files first by shard and then a second level of partitioning within the shards.
-* Sorting the partitioned files by unique id
-* Binary formatting of partitioned files to eliminate all parsing and object creation overhead during the load  
-* On new and first searchers, inside Solr, sorted partitioned binary files are created that reside in the index 
+* Partitioning of raw external text files by shard and then creating a second level of 
+  partitioning within the shards to support parallel loading.
+* Sorting the partitioned files by unique id.
+* Binary formatting of partitioned files to eliminate all parsing and object creation overhead during the load.  
+* On new and first searchers inside Solr,  write sorted partitioned binary files that reside near the index 
   with a mapping between unique id and lucene id. Each of these index partitions match up with a partition 
   of the external files.
 * Parallel loading of the sorted, binary, partitioned files. The loading is done through a very efficient merge
