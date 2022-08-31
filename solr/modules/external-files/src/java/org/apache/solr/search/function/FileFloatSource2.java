@@ -106,7 +106,7 @@ public class FileFloatSource2 extends ValueSource {
   public FunctionValues getValues(Map<Object, Object> context, LeafReaderContext readerContext)
       throws IOException {
 
-    //log.info("FileFloatSource2.getValues()");
+    System.out.println("HERE FileFloatSource2.getValues()");
 
     float[] arr = null;
     Object o = context.get(getClass().getName());
@@ -254,6 +254,8 @@ public class FileFloatSource2 extends ValueSource {
         } else {
           value = innerCache.get(key);
         }
+
+        value = null;
 
         if (value == null) {
           value = new CreationPlaceholder();
@@ -416,52 +418,77 @@ public class FileFloatSource2 extends ValueSource {
 
     public void run() {
 
-      DataInputStream indexIn = null;
-      DataInputStream externalIn = null;
-      final byte[] indexIdBytes = new byte[127];
-      final byte[] externalIdBytes = new byte[127];
+      BufferedInputStream indexIn = null;
+      BufferedInputStream externalIn = null;
+      final byte[] indexBytes = new byte[127];
+      final byte[] externalBytes = new byte[127];
 
       try {
 
-        indexIn = new DataInputStream(new BufferedInputStream(new FileInputStream(indexFile), 131_072));
-        externalIn = new DataInputStream(new BufferedInputStream(new FileInputStream(externalFile), 131_072));
+        indexIn = new BufferedInputStream(new FileInputStream(indexFile), 131_072);
+        externalIn = new BufferedInputStream(new FileInputStream(externalFile), 131_072);
 
-        int indexIdLength = indexIn.readByte();
-        indexIn.read(indexIdBytes, 0, indexIdLength);
-        int luceneId = indexIn.readInt();
+        /*
+        *  Load the first index record:
+        *  Read 5 bytes. The first 4 bytes are the luceneId so construct the int. The 5th byte is the length of the unique id.
+        *  Then load the bytes for for unique id.
+        */
 
-        int externalIdLength = externalIn.readByte();
-        externalIn.read(externalIdBytes, 0, externalIdLength);
-        float fval = externalIn.readFloat();
+        int numRead = indexIn.read(indexBytes, 0, 5);
+        if(numRead < 5) { return;}
+        int luceneId = (((indexBytes[0] & 0xff) << 24) + ((indexBytes[1] & 0xff) << 16) + ((indexBytes[2] & 0xff) << 8) + ((indexBytes[3] & 0xff) << 0));
+        int indexIdLength = indexBytes[4];
+        indexIn.read(indexBytes, 0, indexIdLength);
+
+
+        /*
+         *  Load the first external record:
+         *  Read 5 bytes. The first 4 bytes are the float so construct the float. The 5th byte is the length of the unique id.
+         *  Then load the bytes for for unique id.
+         */
+
+        numRead = externalIn.read(externalBytes, 0, 5);
+        if(numRead < 5) {return;}
+        float fval = Float.intBitsToFloat(((externalBytes[0] & 0xff) << 24) + ((externalBytes[1] & 0xff) << 16) + ((externalBytes[2] & 0xff) << 8) + ((externalBytes[3] & 0xff) << 0));
+        int externalIdLength = externalBytes[4];
+        externalIn.read(externalBytes, 0, externalIdLength);
+
+        int value;
 
         while (true) {
 
-          int value = ExternalFileUtil.compare(indexIdBytes, indexIdLength, externalIdBytes, externalIdLength);
+          value = ExternalFileUtil.compare(indexBytes, indexIdLength, externalBytes, externalIdLength);
 
           if (value == 0) {
 
             vals[luceneId] = fval;
 
-            indexIdLength = indexIn.readByte();
-            indexIn.read(indexIdBytes, 0, indexIdLength);
-            luceneId = indexIn.readInt();
+            numRead = indexIn.read(indexBytes, 0, 5);
+            if(numRead < 5) { return;}
+            luceneId = (((indexBytes[0] & 0xff) << 24) + ((indexBytes[1] & 0xff) << 16) + ((indexBytes[2] & 0xff) << 8) + ((indexBytes[3] & 0xff) << 0));
+            indexIdLength = indexBytes[4];
+            indexIn.read(indexBytes, 0, indexIdLength);
 
-            externalIdLength = externalIn.readByte();
-            externalIn.read(externalIdBytes, 0, externalIdLength);
-            fval = externalIn.readFloat();
+            numRead = externalIn.read(externalBytes, 0, 5);
+            if(numRead < 5) {return;}
+            fval = Float.intBitsToFloat(((externalBytes[0] & 0xff) << 24) + ((externalBytes[1] & 0xff) << 16) + ((externalBytes[2] & 0xff) << 8) + ((externalBytes[3] & 0xff) << 0));
+            externalIdLength = externalBytes[4];
+            externalIn.read(externalBytes, 0, externalIdLength);
 
-          } else if (value < 0) {
-            // Advance only the index
-            indexIdLength = indexIn.readByte();
-            indexIn.read(indexIdBytes, 0, indexIdLength);
-            luceneId = indexIn.readInt();
-
-          } else {
+          } else if (value > 0) {
             // Advance only the external
-            externalIdLength = externalIn.readByte();
-            externalIn.read(externalIdBytes, 0, externalIdLength);
-            fval = externalIn.readFloat();
-
+            numRead = externalIn.read(externalBytes, 0, 5);
+            if(numRead < 5) {return;}
+            fval = Float.intBitsToFloat(((externalBytes[0] & 0xff) << 24) + ((externalBytes[1] & 0xff) << 16) + ((externalBytes[2] & 0xff) << 8) + ((externalBytes[3] & 0xff) << 0));
+            externalIdLength = externalBytes[4];
+            externalIn.read(externalBytes, 0, externalIdLength);
+          } else {
+            // Advance only the index
+            numRead = indexIn.read(indexBytes, 0, 5);
+            if(numRead < 5) { return;}
+            luceneId = (((indexBytes[0] & 0xff) << 24) + ((indexBytes[1] & 0xff) << 16) + ((indexBytes[2] & 0xff) << 8) + ((indexBytes[3] & 0xff) << 0));
+            indexIdLength = indexBytes[4];
+            indexIn.read(indexBytes, 0, indexIdLength);
           }
         }
       } catch (EOFException f) {

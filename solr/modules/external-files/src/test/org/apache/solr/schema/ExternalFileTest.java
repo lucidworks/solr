@@ -128,7 +128,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
     String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS};
     ExternalFileUtil.main(args);
 
-    SolrParams params = params("q", "*:*", "rows", "250", "fl", "id,test_f,field(test_f)");
+    SolrParams params = params("q", "*:*", "rows", "250", "fl", "id,test_f,field(test_ef)");
     SolrClient client = cluster.getSolrClient();
     QueryRequest request = new QueryRequest(params);
     QueryResponse response = request.process(client, COLLECTIONORALIAS);
@@ -139,11 +139,10 @@ public class ExternalFileTest extends SolrCloudTestCase {
       SolrDocument document = documentList.get(i);
       String id = (String)document.getFieldValue("id");
       float f1 = (float)document.getFieldValue("test_f");
-      float f2 = (float)document.getFieldValue("field(test_f)");
+      float f2 = (float)document.getFieldValue("field(test_ef)");
       assertEquals(pairs.get(id), f1, 0);
       assertEquals(f1, f2, 0.0);
     }
-
-    System.out.println("########### Done!");
   }
+
 }

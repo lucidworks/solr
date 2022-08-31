@@ -30,8 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.lang.invoke.MethodHandles;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
+
 
 public class ExternalFileListener implements SolrEventListener {
 
@@ -64,6 +63,7 @@ public class ExternalFileListener implements SolrEventListener {
     try {
 
       log.info("ExternalFileListener write file to {}", dataDirFile.getAbsolutePath());
+
       IndexReader reader = newSearcher.getTopReaderContext().reader();
 
       TermsEnum termsEnum = MultiTerms.getTerms(reader, ID).iterator();
@@ -74,16 +74,21 @@ public class ExternalFileListener implements SolrEventListener {
       while ((bytesRef = termsEnum.next()) != null) {
         postingsEnum = termsEnum.postings(postingsEnum, PostingsEnum.NONE);
         while ((doc = postingsEnum.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
+          log.info("################# Writing Doc:"+doc);
           int hash = ExternalFileUtil.hashCode(bytesRef.bytes, bytesRef.offset, bytesRef.length);
           int bucket = Math.abs(hash) % partitions.length;
           if (partitions[bucket] == null) {
             partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dataDirFile, newSearcherID + "_" + ExternalFileUtil.FINAL_PARTITION_PREFIX + Integer.toString(bucket))), 50000));
           }
+
+          partitions[bucket].writeInt(doc);
           partitions[bucket].writeByte(bytesRef.length);
           partitions[bucket].write(bytesRef.bytes, bytesRef.offset, bytesRef.length);
-          partitions[bucket].writeInt(doc);
         }
       }
+
+
+
     } catch (Exception e) {
       log.error("ExternalFileListener Error", e);
     } finally {

@@ -37,14 +37,14 @@ import java.util.Map;
 public class ExternalFileField2 extends FieldType implements SchemaAware {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private static final String EXTERNAL_ROOT_PATH_VAR = "EXTERNAL_ROOT_PATH";
+  public static final String EXTERNAL_ROOT_PATH_VAR = "EXTERNAL_ROOT_PATH";
   private String keyFieldName;
   private IndexSchema schema;
   private float defVal;
 
   @Override
   protected void init(IndexSchema schema, Map<String, String> args) {
-    log.info("Initializing ExternalFileField2");
+    log.info("Joel Initializing ExternalFileField2");
     restrictProps(SORT_MISSING_FIRST | SORT_MISSING_LAST);
     keyFieldName = args.remove("keyField");
     String defValS = args.remove("defVal");

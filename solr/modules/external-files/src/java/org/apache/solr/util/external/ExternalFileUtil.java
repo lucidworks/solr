@@ -17,7 +17,6 @@
 
 package org.apache.solr.util.external;
 
-import org.apache.lucene.util.BytesRef;
 import org.apache.solr.client.solrj.impl.CloudLegacySolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.common.cloud.DocCollection;
@@ -27,8 +26,6 @@ import org.apache.solr.common.util.Hash;
 
 import java.io.*;
 import java.util.*;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
 
 public class ExternalFileUtil {
 
@@ -102,16 +99,16 @@ public class ExternalFileUtil {
         if (shardOuts.containsKey(shardId)) {
           DataOutputStream shardOut = shardOuts.get(shardId);
           byte[] bytes = id.getBytes();
+          shardOut.writeFloat(f);
           shardOut.writeByte(bytes.length);
           shardOut.write(bytes);
-          shardOut.writeFloat(f);
         } else {
           DataOutputStream shardOut = openShardOut(outRoot, externalFile, shardId, SHARD_TEMP_FILE);
           shardHomes.add(getShardHome(outRoot, externalFile, shardId));
           byte[] bytes = id.getBytes();
+          shardOut.writeFloat(f);
           shardOut.writeByte(bytes.length);
           shardOut.write(bytes);
-          shardOut.writeFloat(f);
           shardOuts.put(shardId, shardOut);
         }
       }
@@ -192,9 +189,9 @@ public class ExternalFileUtil {
     try {
       outSegment = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(segmentFile)));
       for (Record record : records) {
+        outSegment.writeFloat(record.f);
         outSegment.writeByte(record.length);
         outSegment.write(record.bytes, 0, record.length);
-        outSegment.writeFloat(record.f);
       }
     } finally {
       outSegment.close();
@@ -233,12 +230,13 @@ public class ExternalFileUtil {
       mergeOut = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(mergeFile)));
       file1In = new DataInputStream(new BufferedInputStream(new FileInputStream(file1), 50000));
       file2In = new DataInputStream(new BufferedInputStream(new FileInputStream(file2), 50000));
+
+      float f1 = file1In.readFloat();
       byte length1 = file1In.readByte();
       file1In.read(file1Bytes, 0, length1);
-      float f1 = file1In.readFloat();
 
-      byte length2 = file2In.readByte();
       float f2 = file2In.readFloat();
+      byte length2 = file2In.readByte();
       file2In.read(file2Bytes, 0, length2);
 
       boolean file1Done = false;
@@ -246,62 +244,58 @@ public class ExternalFileUtil {
 
       while (!file1Done && !file2Done) {
         int value = compare(file1Bytes, length1, file2Bytes, length2);
-        //System.out.println("");
-        //printBytes("Left compare:", file1Bytes, length1);
-        //printBytes("Right compare:", file2Bytes, length2);
-        //System.out.println("Comp value:"+value);
 
         if (value == 0) {
 
           // We are equal write both
           // In the case of unique ID's this should not happen
+          mergeOut.writeFloat(f1);
           mergeOut.writeByte(length1);
           mergeOut.write(file1Bytes, 0, length1);
-          mergeOut.writeFloat(f1);
 
+          mergeOut.writeFloat(f2);
           mergeOut.writeByte(length2);
           mergeOut.write(file2Bytes, 0, length2);
-          mergeOut.writeFloat(f2);
 
           //Advance left
           try {
+            f1 = file1In.readFloat();
             length1 = file1In.readByte();
             file1In.read(file1Bytes, 0, length1);
-            f1 = file1In.readFloat();
           } catch (EOFException eof) {
             file1Done = true;
           }
           //Advance right
           try {
+            f2 = file2In.readFloat();
             length2 = file2In.readByte();
             file2In.read(file2Bytes, 0, length2);
-            f2 = file2In.readFloat();
           } catch (EOFException eof) {
             file2Done = true;
           }
 
         } else if (value < 0) {
           // Write and advance file1
+          mergeOut.writeFloat(f1);
           mergeOut.writeByte(length1);
           mergeOut.write(file1Bytes, 0, length1);
-          mergeOut.writeFloat(f1);
 
           try {
+            f1 = file1In.readFloat();
             length1 = file1In.readByte();
             file1In.read(file1Bytes, 0, length1);
-            f1 = file1In.readFloat();
           } catch (EOFException eof) {
             file1Done = true;
           }
         } else {
           // Write and advance file2
+          mergeOut.writeFloat(f2);
           mergeOut.writeByte(length2);
           mergeOut.write(file2Bytes, 0, length2);
-          mergeOut.writeFloat(f2);
           try {
+            f2 = file2In.readFloat();
             length2 = file2In.readByte();
             file2In.read(file2Bytes, 0, length1);
-            f2 = file2In.readFloat();
           } catch (EOFException eof) {
             file2Done = true;
           }
@@ -312,15 +306,15 @@ public class ExternalFileUtil {
       if (!file1Done) {
         while (true) {
 
+          mergeOut.writeFloat(f1);
           mergeOut.writeByte(length1);
           mergeOut.write(file1Bytes, 0, length1);
-          mergeOut.writeFloat(f1);
 
           try {
 
+            f1 = file1In.readFloat();
             length1 = file1In.readByte();
             file1In.read(file1Bytes, 0, length1);
-            f1 = file1In.readFloat();
 
           } catch (EOFException eof) {
             // Do nothing
@@ -331,15 +325,14 @@ public class ExternalFileUtil {
 
       if (!file2Done) {
         while (true) {
+          mergeOut.writeFloat(f2);
           mergeOut.writeByte(length2);
           mergeOut.write(file2Bytes, 0, length2);
-          mergeOut.writeFloat(f2);
 
           try {
+            f2 = file2In.readFloat();
             length2 = file2In.readByte();
             file2In.read(file2Bytes, 0, length1);
-            f2 = file2In.readFloat();
-
           } catch (EOFException eof) {
             // Do nothing
             break;
@@ -361,10 +354,10 @@ public class ExternalFileUtil {
     float f;
 
     public void read(DataInputStream dataInputStream) throws IOException {
+      f = dataInputStream.readFloat();
       length = dataInputStream.readByte();
       bytes = new byte[length];
       dataInputStream.read(bytes, 0, length);
-      f = dataInputStream.readFloat();
     }
   }
 
@@ -410,18 +403,17 @@ public class ExternalFileUtil {
       try {
         tempStream = new DataInputStream(new BufferedInputStream(new FileInputStream(tempFile)));
         while (true) {
+          float f = tempStream.readFloat();
           byte b = tempStream.readByte();
           tempStream.read(bytes, 0, b);
-          float f = tempStream.readFloat();
           int hash = hashCode(bytes, 0, b);
           int bucket = Math.abs(hash % partitions.length);
           if (partitions[bucket] == null) {
             partitions[bucket] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(shardHome, SHARD_TEMP_FILE + "." + bucket))));
           }
-
+          partitions[bucket].writeFloat(f);
           partitions[bucket].writeByte(b);
           partitions[bucket].write(bytes, 0, b);
-          partitions[bucket].writeFloat(f);
         }
       } catch (EOFException e) {
         //File ended do nothing.
