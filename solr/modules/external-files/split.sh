@@ -1,4 +1,3 @@
-#!/usr/bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -14,16 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#
+####
 # This script splits the raw text external files and outputs sorted, partitioned, binary files read by ExternalFileField2
 # From root of Solr repo:
 #   ./gradlew -p solr/packaging assemble
 #   cd solr/modules/external-files
 #   ./split.sh $raw_root $out_root $zhHost $collection
-#
+####
 
-
-java -cp ./build/libs/*:../../server/solr-webapp/webapp/WEB-INF/lib/*:../../server/lib/*:../server/lib/ext/* org.apache.solr.util.external.ExternalFileUtil $1 $2 $3 $4
-
-
-
+java -cp ./build/libs/*:../../server/build/packaging/solr-webapp/webapp/WEB-INF/lib/*:../../server/build/packaging/server/lib/*:../../server/build/packaging/lib/ext/* org.apache.solr.util.external.ExternalFileUtil $1 $2 $3 $4
