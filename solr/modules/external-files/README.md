@@ -59,7 +59,7 @@ cd solr/modules/external-files
 ./split.sh $raw_root $out_root $zhHost $collection
 ```
 
-NOTE: This will eventually be simplified when external-file module is shipped with the binary distribution of Solr.
+NOTE: This will eventually be simplified when the external-file module is shipped with the binary distribution of Solr.
 
 The EFU will walk the raw files root dir looking for newly added external files. It compares timestamp directories for each
 file to determine if a new version of a file is available. It will process all new files and emit partitioned, binary files
