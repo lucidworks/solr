@@ -46,7 +46,7 @@ startup command which includes the external-file module and the `EXTERNAL_ROOT_P
 The org.apache.solr.util.external.ExternalFileUtil class is a command line tool used to process the raw external files
 and produce the partitioned output. There is a `split.sh` shell script which can be used to run the EFU.
 
-Syntax:
+Steps to run split.sh:
 
 ```
 # Build and package the jars
