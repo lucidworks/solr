@@ -25,11 +25,10 @@ each partition which merges an external partition with its matching internal ind
   on each Solr replica to avoid the need to replicate the data to each node.
   
 It's useful to contrast this design with the external file field implementation in Solr core. The design in Solr core
-uses a monolithic text file which is optionally sorted. The entire file is loaded in a single thread by 
-repeated seeks into the Lucene index to match up the lucene id with a specific float from the file. Sharding 
-has limited effect load performance because it must still perform seeks for each unique id in the file, and a miss is 
-almost as expensive as a hit. There is no LRU cache so all memory can quickly fill up if 
-many external file fields are loaded.
+uses a monolithic text file which is optionally sorted. The entire file is loaded in a **single thread** by 
+repeated seeks into the Lucene index to match up the Lucene id with a specific float from the file. Sharding 
+provides limited performance improvement because every shard must still process every record in the monolithic file. 
+There is no LRU cache so all memory can quickly fill up if many external file fields are loaded.
 
 
 # Getting Started
