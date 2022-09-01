@@ -103,7 +103,7 @@ Once configured the `field` function query can be used to access the external fl
 accepts function queries. A sample call would look like this: `field(customer1_ef)`. In this example
 the `customer1_ef` name would map to the `filename` directory in the external file root path:
 
-${externalFilesRoot}/bucket[0-249]/**filename**/timestamp/shardId/partition_[0-7].bin
+${externalFilesRoot}/bucket[0-249]/**customer1_ef**/timestamp/shardId/partition_[0-7].bin
 
 More details about the directories under the external file root can be found below. 
 
