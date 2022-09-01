@@ -24,7 +24,7 @@ each partition which merges an external partition with its matching internal ind
 * Support for a configurable directory for external files. This allows external files to be mounted as a shared drive
   on each Solr replica to avoid the need to replicate the data to each node.
   
-It's useful to contrast this design with the external file field design in Solr core. The design in Solr core
+It's useful to contrast this design with the external file field implementation in Solr core. The design in Solr core
 uses a monolithic text file which is optionally sorted. The entire file is loaded in a single thread by 
 repeated seeks into the Lucene index to match up the lucene id with a specific float from the file. Sharding 
 has limited effect load performance because it must still perform seeks for each unique id in the file, and a miss is 
