@@ -243,7 +243,7 @@ public class ExternalFileUtil {
       boolean file2Done = false;
 
       while (!file1Done && !file2Done) {
-        int value = compare(file1Bytes, length1, file2Bytes, length2);
+        int value = compare(file1Bytes, 0, length1, file2Bytes, 0, length2);
 
         if (value == 0) {
 
@@ -364,7 +364,7 @@ public class ExternalFileUtil {
   public static class ByteComp implements Comparator<Record> {
 
     public int compare(Record rec1, Record rec2) {
-      return ExternalFileUtil.compare(rec1.bytes, rec1.length, rec2.bytes, rec2.length);
+      return ExternalFileUtil.compare(rec1.bytes, 0, rec1.length, rec2.bytes, 0, rec2.length);
     }
   }
 
@@ -372,8 +372,10 @@ public class ExternalFileUtil {
   * Performs unsigned byte lexical comparison
    */
   public static final int compare(final byte[] left,
+                                  final int leftOffset,
                                   final int length1,
                                   final byte[] right,
+                                  final int rightOffset,
                                   final int length2) {
 
     final int minLength = length1 < length2 ? length1 : length2;
@@ -382,8 +384,8 @@ public class ExternalFileUtil {
     int b;
 
     for (int i = 0; i < minLength; ++i) {
-      a = left[i] & 0xff;
-      b = right[i] & 0xff;
+      a = left[leftOffset+i] & 0xff;
+      b = right[rightOffset+i] & 0xff;
       if (a != b) {
         return a - b;
       }

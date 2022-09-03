@@ -17,12 +17,7 @@
 
 package org.apache.solr.search.function;
 
-import java.io.IOException;
-import java.io.DataInputStream;
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
-import java.io.File;
-import java.io.EOFException;
+import java.io.*;
 import java.lang.invoke.MethodHandles;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -106,7 +101,6 @@ public class FileFloatSource2 extends ValueSource {
   public FunctionValues getValues(Map<Object, Object> context, LeafReaderContext readerContext)
       throws IOException {
 
-    System.out.println("HERE FileFloatSource2.getValues()");
 
     float[] arr = null;
     Object o = context.get(getClass().getName());
@@ -408,87 +402,116 @@ public class FileFloatSource2 extends ValueSource {
       this.vals = vals;
     }
 
-    private String toString(byte[] bytes, int length) {
+    private String toString(byte[] bytes, int offset, int length) {
       StringBuffer buf = new StringBuffer();
       for(int i=0; i<length; i++) {
-        buf.append((char)bytes[i]);
+        buf.append((char)bytes[offset+i]);
       }
       return buf.toString();
     }
 
     public void run() {
 
-      BufferedInputStream indexIn = null;
-      BufferedInputStream externalIn = null;
-      final byte[] indexBytes = new byte[127];
-      final byte[] externalBytes = new byte[127];
+      PushbackInputStream indexIn = null;
+      PushbackInputStream externalIn = null;
+      final byte[] indexBytes = new byte[131_072];
+      final byte[] externalBytes = new byte[131_072];
+      int indexOffset = 0;
+      int indexLength;
+      int externalOffset = 0;
+      int externalLength;
+
 
       try {
 
-        indexIn = new BufferedInputStream(new FileInputStream(indexFile), 131_072);
-        externalIn = new BufferedInputStream(new FileInputStream(externalFile), 131_072);
+        indexIn = new PushbackInputStream(new FileInputStream(indexFile), 250);
+        externalIn = new PushbackInputStream(new FileInputStream(externalFile), 250);
 
         /*
         *  Load the first index record:
         *  Read 5 bytes. The first 4 bytes are the luceneId so construct the int. The 5th byte is the length of the unique id.
-        *  Then load the bytes for for unique id.
         */
 
-        int numRead = indexIn.read(indexBytes, 0, 5);
-        if(numRead < 5) { return;}
-        int luceneId = (((indexBytes[0] & 0xff) << 24) + ((indexBytes[1] & 0xff) << 16) + ((indexBytes[2] & 0xff) << 8) + ((indexBytes[3] & 0xff) << 0));
-        int indexIdLength = indexBytes[4];
-        indexIn.read(indexBytes, 0, indexIdLength);
+        indexLength = indexIn.read(indexBytes);
+        if(indexLength <= 0) { return;}
+        int luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + ((indexBytes[indexOffset++] & 0xff) << 0));
+        int indexIdLength = indexBytes[indexOffset++];
 
 
         /*
          *  Load the first external record:
          *  Read 5 bytes. The first 4 bytes are the float so construct the float. The 5th byte is the length of the unique id.
-         *  Then load the bytes for for unique id.
          */
 
-        numRead = externalIn.read(externalBytes, 0, 5);
-        if(numRead < 5) {return;}
-        float fval = Float.intBitsToFloat(((externalBytes[0] & 0xff) << 24) + ((externalBytes[1] & 0xff) << 16) + ((externalBytes[2] & 0xff) << 8) + ((externalBytes[3] & 0xff) << 0));
-        int externalIdLength = externalBytes[4];
-        externalIn.read(externalBytes, 0, externalIdLength);
+        externalLength = externalIn.read(externalBytes);
+        if(externalLength <= 0) {return;}
+        float fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + ((externalBytes[externalOffset++] & 0xff) << 0));
+        int externalIdLength = externalBytes[externalOffset++];
 
         int value;
 
         while (true) {
 
-          value = ExternalFileUtil.compare(indexBytes, indexIdLength, externalBytes, externalIdLength);
+          value = ExternalFileUtil.compare(indexBytes, indexOffset, indexIdLength, externalBytes, externalOffset, externalIdLength);
 
           if (value == 0) {
 
             vals[luceneId] = fval;
 
-            numRead = indexIn.read(indexBytes, 0, 5);
-            if(numRead < 5) { return;}
-            luceneId = (((indexBytes[0] & 0xff) << 24) + ((indexBytes[1] & 0xff) << 16) + ((indexBytes[2] & 0xff) << 8) + ((indexBytes[3] & 0xff) << 0));
-            indexIdLength = indexBytes[4];
-            indexIn.read(indexBytes, 0, indexIdLength);
+            //Advance the index file
+            indexOffset += indexIdLength;
+            if(indexLength - indexOffset < 200) {
+              int bytesRead = ensure(indexIn, indexBytes, indexOffset, indexLength);
+              if(bytesRead > -1) {
+                indexOffset = 0;
+                indexLength = bytesRead;
+              }
+            }
+            luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + ((indexBytes[indexOffset++] & 0xff) << 0));
+            indexIdLength = indexBytes[indexOffset++];
 
-            numRead = externalIn.read(externalBytes, 0, 5);
-            if(numRead < 5) {return;}
-            fval = Float.intBitsToFloat(((externalBytes[0] & 0xff) << 24) + ((externalBytes[1] & 0xff) << 16) + ((externalBytes[2] & 0xff) << 8) + ((externalBytes[3] & 0xff) << 0));
-            externalIdLength = externalBytes[4];
-            externalIn.read(externalBytes, 0, externalIdLength);
+
+
+            //Advance the external file
+            externalOffset += externalIdLength;
+            if(externalLength - externalOffset < 200) {
+              int bytesRead = ensure(externalIn, externalBytes, externalOffset, externalLength);
+              if(bytesRead > -1) {
+                //Buffer refilled
+                externalOffset = 0;
+                externalLength = bytesRead;
+              }
+            }
+            fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + ((externalBytes[externalOffset++] & 0xff) << 0));
+            externalIdLength = externalBytes[externalOffset++];
 
           } else if (value > 0) {
-            // Advance only the external
-            numRead = externalIn.read(externalBytes, 0, 5);
-            if(numRead < 5) {return;}
-            fval = Float.intBitsToFloat(((externalBytes[0] & 0xff) << 24) + ((externalBytes[1] & 0xff) << 16) + ((externalBytes[2] & 0xff) << 8) + ((externalBytes[3] & 0xff) << 0));
-            externalIdLength = externalBytes[4];
-            externalIn.read(externalBytes, 0, externalIdLength);
+
+            externalOffset += externalIdLength;
+            if(externalLength - externalOffset < 200) {
+              int bytesRead = ensure(externalIn, externalBytes, externalOffset, externalLength);
+              if(bytesRead > -1) {
+                //Buffer refilled
+                externalOffset = 0;
+                externalLength = bytesRead;
+              }
+            }
+            fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + ((externalBytes[externalOffset++] & 0xff) << 0));
+            externalIdLength = externalBytes[externalOffset++];
+
           } else {
             // Advance only the index
-            numRead = indexIn.read(indexBytes, 0, 5);
-            if(numRead < 5) { return;}
-            luceneId = (((indexBytes[0] & 0xff) << 24) + ((indexBytes[1] & 0xff) << 16) + ((indexBytes[2] & 0xff) << 8) + ((indexBytes[3] & 0xff) << 0));
-            indexIdLength = indexBytes[4];
-            indexIn.read(indexBytes, 0, indexIdLength);
+            indexOffset += indexIdLength;
+            if(indexLength - indexOffset < 200) {
+              int bytesRead = ensure(indexIn, indexBytes, indexOffset, indexLength);
+              if(bytesRead > -1) {
+                //Buffer refilled
+                indexOffset = 0;
+                indexLength = bytesRead;
+              }
+            }
+            luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + ((indexBytes[indexOffset++] & 0xff) << 0));
+            indexIdLength = indexBytes[indexOffset++];
           }
         }
       } catch (EOFException f) {
@@ -509,6 +532,52 @@ public class FileFloatSource2 extends ValueSource {
 
         }
       }
+    }
+
+
+    /*
+    * Return -1 if the buffer is unchanged and positive if the buffer has been refilled.
+    */
+
+    private int ensure(PushbackInputStream in, byte[] bytes, int offset, int length) throws IOException {
+      int bytesRead = -1;
+
+      if(length == bytes.length) {
+        /*
+        *  We had a full buffer on the last read. So likely there is more data.
+        */
+
+        if(offset < length) {
+          /*
+          *  There is data still left in the buffer. Let's unread it.
+          */
+          in.unread(bytes, offset, length - offset);
+        }
+
+        /*
+        * Re-read the buffer
+        */
+        bytesRead = in.read(bytes);
+
+        if (bytesRead <= 0) {
+          /*
+          * Nothing was read, which means that nothing was pushed back into the buffer either. We are done.
+          */
+          throw new EOFException();
+        }
+      } else if(offset >= length) {
+        /*
+        *  Two conditions must be true in this block.
+        *  1) The buffer was not filled on the last read, which means there is no more data in the file.
+        *  2) We've fully read this buffer
+        *
+        *  We are done.
+        */
+        throw new EOFException();
+      }
+
+      return bytesRead;
+
     }
   }
 
