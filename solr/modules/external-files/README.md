@@ -266,38 +266,40 @@ This includes: field lists, sorting fields, collapse, facet aggregations, frange
 
 ## Caching
 
-Once loaded external files are cached in memory as float arrays indexed by 
-global unique id. This cache is automatically cleared when a new searcher is
+Once loaded, external files are cached in memory as an array of floats indexed by 
+global lucene id. This cache is automatically cleared when a new searcher is
 opened and the external files will be reloaded into the cache on first request.
 
 ### LRU
 
-The cache is an LRU cache with a fixed size at startup. Once the cache fills to
-capacity external files will be evicted based on an LRU algorithm.
+The external file cache is an LRU cache with a size set at startup. 
+Once the cache fills to capacity external files will be evicted 
+based on an LRU algorithm.
 
 The variable `LRU_CACHE_SIZE` can be set either in the unix environment or as 
-java startup parameter. This variable controls the number of external files
+a java startup parameter. This variable controls the number of external files
 held in the cache. The default size is 30.
 
 ### TTL
 
 External files can also be configured with a time-to-live (ttl). Once the ttl
-expires the external file will be checked for a newer version on-disk. If
-a newer on-disk version exists it will loaded. The ttl resets after each
+expires the external file will be checked for a newer on-disk version. If
+a newer version exists it will be loaded. The ttl resets after each
 check.
 
-The ttl can be configured in millis on the field type definition in schema
+The ttl can be configured, in millis, on the field type definition in the schema
 using the `ttl` parameter as follows:
 
 ```   
 <fieldType name="external_float" defVal="0" ttl="300000" stored="false" indexed="false" class="org.apache.solr.schema.ExternalFileField2"/>
 ```
 
-Different field type types can define different ttl values.
+Different field types can define different ttl values allowing different types of
+external files to expire at different intervals. 
 
 ### Hash Based Replica Selection
 
-Solr Cloud supports hashed based stable replica selection 
+Solr Cloud supports hashed based, stable replica selection 
 which can be used in conjunction the external file module's cache. With stable
 replica selection users that use specific external files can be sent to specific
 replicas. This has the following advantages:
@@ -308,7 +310,7 @@ each time.
 * External files will be partitioned evenly across the replicas rather than each
 replica loading each external file. This will result in less LRU churn.
   
-* Provides a consistant view of external files as their ttl expires and data is
+* Provides a consistent view of external files as their ttl expires and data is
 reloaded. Because ttl expiration is not synchronized across replicas it is possible
 to see different versions of the external files on different requests if a ttl is
 used without stable replica selection.  
