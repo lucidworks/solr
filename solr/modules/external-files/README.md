@@ -281,11 +281,41 @@ held in the cache. The default size is 30.
 
 ### TTL
 
+External files can also be configured with a time-to-live (ttl). Once the ttl
+expires the external file will be checked for a newer version on-disk. If
+a newer on-disk version exists it will loaded. The ttl resets after each
+check.
 
+The ttl can be configured in millis on the field type definition in schema
+using the `ttl` parameter as follows:
 
+```   
+<fieldType name="external_float" defVal="0" ttl="300000" stored="false" indexed="false" class="org.apache.solr.schema.ExternalFileField2"/>
+```
+
+Different field type types can define different ttl values.
 
 ### Hash Based Replica Selection
 
+Solr Cloud supports hashed based stable replica selection 
+which can be used in conjunction the external file module's cache. With stable
+replica selection users that use specific external files can be sent to specific
+replicas. This has the following advantages:
 
+* Users will be more likely to get a cache hit as they are hitting the same replica
+each time. 
+  
+* External files will be partitioned evenly across the replicas rather than each
+replica loading each external file. This will result in less LRU churn.
+  
+* Provides a consistant view of external files as their ttl expires and data is
+reloaded. Because ttl expiration is not synchronized across replicas it is possible
+to see different versions of the external files on different requests if a ttl is
+used without stable replica selection.  
+  
+Stable replica placement can be achieved using Solr's `shards.preference` parameter.
+
+See the Solr `shards.preference` documentation for more detailed specification
+of stable replica selection.
  
 
