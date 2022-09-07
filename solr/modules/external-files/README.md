@@ -272,7 +272,7 @@ opened and the external files will be reloaded into the cache on first request.
 
 ### LRU
 
-The external file cache is a LRU cache with the size set at startup. 
+The external file cache is an LRU cache with the size set at startup. 
 Once the cache fills to capacity external files will be evicted 
 based on the LRU algorithm.
 
