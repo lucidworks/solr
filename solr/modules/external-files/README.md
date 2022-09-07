@@ -264,8 +264,27 @@ $root/bucket[0-249]/customer1_ef/timestamp
 * Once loaded and cached the floats are mapped to Lucene ids and can be used anywhere a function query can be used.
 This includes: field lists, sorting fields, collapse, facet aggregations, frange filter queries, facet queries (frange filter queries)
 
-## Caching of the Files
+## Caching
 
+Once loaded external files are cached in memory as float arrays indexed by 
+global unique id. This cache is automatically cleared when a new searcher is
+opened and the external files will be reloaded into the cache on first request.
+
+### LRU
+
+The cache is an LRU cache with a fixed size at startup. Once the cache fills to
+capacity external files will be evicted based on an LRU algorithm.
+
+The variable `LRU_CACHE_SIZE` can be set either in the unix environment or as 
+java startup parameter. This variable controls the number of external files
+held in the cache. The default size is 30.
+
+### TTL
+
+
+
+
+### Hash Based Replica Selection
 
 
  
