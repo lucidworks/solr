@@ -297,7 +297,7 @@ using the `ttl` parameter as follows:
 Different field types can define different ttl values allowing different types of
 external files to expire at different intervals. 
 
-### Hash Based Replica Selection
+### Stable Replica Selection
 
 Solr Cloud supports hashed based, stable replica selection 
 which can be used in conjunction the external file module's cache. With stable
