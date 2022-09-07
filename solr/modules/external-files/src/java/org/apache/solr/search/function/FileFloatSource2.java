@@ -36,6 +36,7 @@ import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.handler.RequestHandlerUtils;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
+import org.apache.solr.schema.ExternalFileField2;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.security.AuthorizationContext;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
@@ -56,9 +57,10 @@ public class FileFloatSource2 extends ValueSource {
   private final float defVal;
   private final File dataDir;
   private final File externalDir;
-  private final String fileNameStripped;
+  private final String fileName;
   private final String searcherId;
   private final String shardId;
+  private final long ttl;
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -70,19 +72,20 @@ public class FileFloatSource2 extends ValueSource {
    * @param defVal the default value to use if a field has no entry in the external file
    * @param dataDir the directory in which to look for the external file
    */
-  public FileFloatSource2(SchemaField field, SchemaField keyField, float defVal, String dataDir, String externalDir, String searcherId, String shardId) {
+  public FileFloatSource2(SchemaField field, SchemaField keyField, float defVal, String dataDir, String externalDir, String searcherId, String shardId, long ttl) {
     this.field = field;
-    this.fileNameStripped = field.getName().replace("_ef$", "");
+    this.fileName= field.getName();
     this.keyField = keyField;
     this.defVal = defVal;
     this.dataDir = new File(new File(dataDir), "external");
     this.externalDir = new File(externalDir);
     this.searcherId = searcherId;
     this.shardId = shardId;
+    this.ttl = ttl;
 
     log.info("Constructing FileFloatSource2");
     log.info("field={}", field.getName());
-    log.info("fileNameStripped={}", fileNameStripped);
+    log.info("fileNameStripped={}", fileName);
     log.info("keyField={}", keyField.getName());
     log.info("defVal={}", Float.toString(defVal));
     log.info("dataDir={}", this.dataDir.getAbsolutePath());
@@ -108,7 +111,7 @@ public class FileFloatSource2 extends ValueSource {
     if(o instanceof Map) {
 
       floatMap = (Map<String, float[]>)o;
-      arr = floatMap.get(this.fileNameStripped);
+      arr = floatMap.get(this.fileName);
     } else {
       floatMap = new HashMap<>();
       context.put(getClass().getName(), floatMap);
@@ -120,7 +123,7 @@ public class FileFloatSource2 extends ValueSource {
       IndexReaderContext topLevelContext = ReaderUtil.getTopLevelContext(readerContext);
       arr = getCachedFloats(topLevelContext.reader());
       if(arr != null) {
-        floatMap.put(this.fileNameStripped, arr);
+        floatMap.put(this.fileName, arr);
       }
     }
 
@@ -209,7 +212,7 @@ public class FileFloatSource2 extends ValueSource {
 
   private final float[] getCachedFloats(IndexReader reader) {
     log.info("FileFloatSource2 Getting cached floats");
-    return (float[]) floatCache.get(reader, new Entry(this));
+    return (float[]) floatCache.get(reader, new Entry(this), ttl);
   }
 
   static Cache floatCache =
@@ -226,6 +229,19 @@ public class FileFloatSource2 extends ValueSource {
 
     protected abstract Object createValue(IndexReader reader, Object key, CachedFloats cachedFloats);
 
+    private int getCacheSize() {
+      String cacheSize = System.getProperty(ExternalFileField2.LRU_CACHE_SIZE_VAR);
+      if(cacheSize == null) {
+        cacheSize = System.getenv(ExternalFileField2.LRU_CACHE_SIZE_VAR);
+      }
+
+      if(cacheSize == null) {
+        return ExternalFileField2.DEFAULT_LRU_CACHE_SIZE;
+      } else {
+        return Integer.parseInt(cacheSize);
+      }
+    }
+
     public void refresh(IndexReader reader, Object key) {
       Object refreshedValues = createValue(reader, key, null);
       synchronized (readerCache) {
@@ -234,7 +250,7 @@ public class FileFloatSource2 extends ValueSource {
       }
     }
 
-    public Object get(IndexReader reader, Object key) {
+    public Object get(IndexReader reader, Object key, long ttl) {
       Map<Object, Object> innerCache;
       Object value;
       long timeStamp = System.currentTimeMillis();
@@ -242,14 +258,12 @@ public class FileFloatSource2 extends ValueSource {
       synchronized (readerCache) {
         innerCache = readerCache.get(reader);
         if (innerCache == null) {
-          innerCache = new LRUCache<>(30);
+          innerCache = new LRUCache<>(getCacheSize());
           readerCache.put(reader, innerCache);
           value = null;
         } else {
           value = innerCache.get(key);
         }
-
-        value = null;
 
         if (value == null) {
           value = new CreationPlaceholder();
@@ -293,6 +307,7 @@ public class FileFloatSource2 extends ValueSource {
               CachedFloats _cachedFloats = new CachedFloats();
               _cachedFloats.floats = (float[]) progress.value;
               _cachedFloats.lastChecked = _cachedFloats.loadTime = timeStamp;
+              _cachedFloats.ttl = ttl;
               synchronized (readerCache) {
                 innerCache.put(key, _cachedFloats);
               }
@@ -346,7 +361,7 @@ public class FileFloatSource2 extends ValueSource {
 
     File latestExternalDir = getLatestFileDir(
         ffs.externalDir,
-        ffs.fileNameStripped,
+        ffs.fileName,
         ffs.shardId,
         cachedFloats == null ? -1 : cachedFloats.loadTime);
 
@@ -434,7 +449,7 @@ public class FileFloatSource2 extends ValueSource {
 
         indexLength = indexIn.read(indexBytes);
         if(indexLength <= 0) { return;}
-        int luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + ((indexBytes[indexOffset++] & 0xff) << 0));
+        int luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + (indexBytes[indexOffset++] & 0xff));
         int indexIdLength = indexBytes[indexOffset++];
 
 
@@ -445,7 +460,7 @@ public class FileFloatSource2 extends ValueSource {
 
         externalLength = externalIn.read(externalBytes);
         if(externalLength <= 0) {return;}
-        float fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + ((externalBytes[externalOffset++] & 0xff) << 0));
+        float fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + (externalBytes[externalOffset++] & 0xff));
         int externalIdLength = externalBytes[externalOffset++];
 
         int value;
@@ -467,50 +482,48 @@ public class FileFloatSource2 extends ValueSource {
                 indexLength = bytesRead;
               }
             }
-            luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + ((indexBytes[indexOffset++] & 0xff) << 0));
+            luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + (indexBytes[indexOffset++] & 0xff));
             indexIdLength = indexBytes[indexOffset++];
-
-
 
             //Advance the external file
             externalOffset += externalIdLength;
-            if(externalLength - externalOffset < 200) {
+            if (externalLength - externalOffset < 200) {
               int bytesRead = ensure(externalIn, externalBytes, externalOffset, externalLength);
-              if(bytesRead > -1) {
+              if (bytesRead > -1) {
                 //Buffer refilled
                 externalOffset = 0;
                 externalLength = bytesRead;
               }
             }
-            fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + ((externalBytes[externalOffset++] & 0xff) << 0));
+            fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + (externalBytes[externalOffset++] & 0xff));
             externalIdLength = externalBytes[externalOffset++];
 
           } else if (value > 0) {
 
             externalOffset += externalIdLength;
-            if(externalLength - externalOffset < 200) {
+            if (externalLength - externalOffset < 200) {
               int bytesRead = ensure(externalIn, externalBytes, externalOffset, externalLength);
-              if(bytesRead > -1) {
+              if (bytesRead > -1) {
                 //Buffer refilled
                 externalOffset = 0;
                 externalLength = bytesRead;
               }
             }
-            fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + ((externalBytes[externalOffset++] & 0xff) << 0));
+            fval = Float.intBitsToFloat(((externalBytes[externalOffset++] & 0xff) << 24) + ((externalBytes[externalOffset++] & 0xff) << 16) + ((externalBytes[externalOffset++] & 0xff) << 8) + (externalBytes[externalOffset++] & 0xff));
             externalIdLength = externalBytes[externalOffset++];
 
           } else {
             // Advance only the index
             indexOffset += indexIdLength;
-            if(indexLength - indexOffset < 200) {
+            if (indexLength - indexOffset < 200) {
               int bytesRead = ensure(indexIn, indexBytes, indexOffset, indexLength);
-              if(bytesRead > -1) {
+              if (bytesRead > -1) {
                 //Buffer refilled
                 indexOffset = 0;
                 indexLength = bytesRead;
               }
             }
-            luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + ((indexBytes[indexOffset++] & 0xff) << 0));
+            luceneId = (((indexBytes[indexOffset++] & 0xff) << 24) + ((indexBytes[indexOffset++] & 0xff) << 16) + ((indexBytes[indexOffset++] & 0xff) << 8) + (indexBytes[indexOffset++] & 0xff));
             indexIdLength = indexBytes[indexOffset++];
           }
         }

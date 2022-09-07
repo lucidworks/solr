@@ -38,8 +38,11 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String EXTERNAL_ROOT_PATH_VAR = "EXTERNAL_ROOT_PATH";
+  public static final String LRU_CACHE_SIZE_VAR = "LRU_CACHE_SIZE";
+  public static final int DEFAULT_LRU_CACHE_SIZE = 30;
   private String keyFieldName;
   private IndexSchema schema;
+  private long ttl;
   private float defVal;
 
   @Override
@@ -47,8 +50,10 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
     log.info("Joel Initializing ExternalFileField2");
     restrictProps(SORT_MISSING_FIRST | SORT_MISSING_LAST);
     keyFieldName = args.remove("keyField");
+    String ttlS = args.remove("ttl");
     String defValS = args.remove("defVal");
     defVal = defValS == null ? 0 : Float.parseFloat(defValS);
+    ttl = ttlS == null ? 300000 : Long.parseLong(ttlS);
     this.schema = schema;
   }
 
@@ -77,7 +82,7 @@ public class ExternalFileField2 extends FieldType implements SchemaAware {
   public FileFloatSource2 getFileFloatSource(SchemaField field, String datadir, String searcherId, String shardId) {
     // Because the float source uses a static cache, all source objects will
     // refer to the same data.
-    return new FileFloatSource2(field, getKeyField(), defVal, datadir, getExternalRoot(), searcherId, shardId);
+    return new FileFloatSource2(field, getKeyField(), defVal, datadir, getExternalRoot(), searcherId, shardId, ttl);
   }
 
   public FileFloatSource2 getFileFloatSource(SchemaField field) {
