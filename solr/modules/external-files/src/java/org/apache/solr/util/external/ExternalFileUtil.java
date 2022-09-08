@@ -126,6 +126,7 @@ public class ExternalFileUtil {
     System.out.println("Time:" + (end - start) / (1_000_000));
   }
 
+
   public static void sortPartitions(List<File> shardHomes) throws IOException {
     for (File shardHome : shardHomes) {
       for (int i = 0; i < NUM_PARTITIONS; i++) {
@@ -135,6 +136,7 @@ public class ExternalFileUtil {
       new File(shardHome, SHARD_COMPLETE_FILE).createNewFile();
     }
   }
+
 
   public static List<File> sortPartition(File shardHome, int partitionNumber) throws IOException {
     DataInputStream partitionIn = null;
@@ -174,6 +176,7 @@ public class ExternalFileUtil {
           ++segment;
         }
       }
+
       File finalSegment = mergeSegments(segments);
       finalSegment.renameTo(new File(finalSegment.getParentFile(), FINAL_PARTITION_PREFIX + partitionNumber));
       return segments;
@@ -239,10 +242,10 @@ public class ExternalFileUtil {
       byte length2 = file2In.readByte();
       file2In.read(file2Bytes, 0, length2);
 
-      boolean file1Done = false;
-      boolean file2Done = false;
+      boolean file1Read = true;
+      boolean file2Read = true;
 
-      while (!file1Done && !file2Done) {
+      while (file1Read && file2Read) {
         int value = compare(file1Bytes, 0, length1, file2Bytes, 0, length2);
 
         if (value == 0) {
@@ -263,7 +266,7 @@ public class ExternalFileUtil {
             length1 = file1In.readByte();
             file1In.read(file1Bytes, 0, length1);
           } catch (EOFException eof) {
-            file1Done = true;
+            file1Read = false;
           }
           //Advance right
           try {
@@ -271,7 +274,7 @@ public class ExternalFileUtil {
             length2 = file2In.readByte();
             file2In.read(file2Bytes, 0, length2);
           } catch (EOFException eof) {
-            file2Done = true;
+            file2Read = false;
           }
 
         } else if (value < 0) {
@@ -285,25 +288,26 @@ public class ExternalFileUtil {
             length1 = file1In.readByte();
             file1In.read(file1Bytes, 0, length1);
           } catch (EOFException eof) {
-            file1Done = true;
+            file1Read = false;
           }
         } else {
           // Write and advance file2
           mergeOut.writeFloat(f2);
           mergeOut.writeByte(length2);
           mergeOut.write(file2Bytes, 0, length2);
+
           try {
             f2 = file2In.readFloat();
             length2 = file2In.readByte();
             file2In.read(file2Bytes, 0, length1);
           } catch (EOFException eof) {
-            file2Done = true;
+            file2Read = false;
           }
         }
       }
 
       //One of the files is done write out the other file
-      if (!file1Done) {
+      if (file1Read) {
         while (true) {
 
           mergeOut.writeFloat(f1);
@@ -323,7 +327,7 @@ public class ExternalFileUtil {
         }
       }
 
-      if (!file2Done) {
+      if (file2Read) {
         while (true) {
           mergeOut.writeFloat(f2);
           mergeOut.writeByte(length2);
@@ -339,7 +343,7 @@ public class ExternalFileUtil {
           }
         }
       }
-    } catch (Exception e) {
+    } finally {
       file1In.close();
       file2In.close();
       mergeOut.close();
