@@ -273,8 +273,8 @@ opened and the external files will be reloaded into the cache on first request.
 ### LRU
 
 The external file cache is an LRU cache with the size set at startup. 
-Once the cache fills to capacity external files will be evicted 
-based on the LRU algorithm.
+Once the cache fills to capacity the least recently used external file will be evicted 
+from the cache.
 
 The variable `LRU_CACHE_SIZE` can be set either in the unix environment or as 
 a java startup parameter. This variable controls the number of external files
