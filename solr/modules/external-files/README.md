@@ -160,15 +160,15 @@ Sample full file path:
 $root/bucket1/foo_ef/1661540544007/foo_ef.txt
 
 The format of the text file is:
-
+```
 id1:float1
 id2:float2
-
+```
 OR
-
+```
 id1:routeKey1:float1
 id2:routeKey1:float2
-
+```
 The `id` must map to a unique Id in a Solr collection. The `float` value must parse to a Java float. The routeKey
 must be provided if documents are routed to shards with a specific route key. ExternalFileUtil splits
 each file into separate files for each shard. The ids do not need to be sorted as files will be sorted by 
