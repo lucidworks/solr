@@ -120,7 +120,7 @@ public class ExternalFile {
               // Rewrite create the new timeDir
               File incDir = new File(currentFile, lastInc);
               incDir.mkdirs();
-              File newFile = new File(incDir, currentFile.getName()+"txt");
+              File newFile = new File(incDir, currentFile.getName()+".txt");
 
               File[] targets = timeDir.listFiles();
               File targetFile = null;
