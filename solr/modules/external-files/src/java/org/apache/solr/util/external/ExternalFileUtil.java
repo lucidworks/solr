@@ -25,6 +25,8 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.util.Hash;
 
 import java.io.*;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.*;
 
 public class ExternalFileUtil {
@@ -49,8 +51,20 @@ public class ExternalFileUtil {
     String mainCollection = args[3];
 
     CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
-
+    RandomAccessFile raFile = null;
+    FileChannel fileChannel = null;
+    FileLock fileLock = null;
+    File lockFile = null;
+    boolean lockAcquired = false;
     try {
+      /*
+      * Acquire the file lock
+      */
+      lockFile = new File(inRoot, "lock");
+      raFile = new RandomAccessFile(lockFile, "rw");
+      fileChannel = raFile.getChannel();
+      fileLock = fileChannel.tryLock();
+      lockAcquired = true;
       solrClient.connect();
       Iterator<ExternalFile> iterator = iterate(inRoot);
       while (iterator.hasNext()) {
@@ -58,7 +72,22 @@ public class ExternalFileUtil {
         process(externalFile, outRoot, solrClient, mainCollection);
       }
     } finally {
-      solrClient.close();
+
+      /*
+      * Release the file lock
+      */
+
+      if(lockAcquired) {
+        fileLock.release();
+      }
+
+      fileChannel.close();
+      raFile.close();
+
+      if(lockAcquired) {
+        lockFile.delete();
+        solrClient.close();
+      }
     }
   }
 

@@ -17,8 +17,11 @@
 
 package org.apache.solr.util.external;
 
-import java.io.File;
+import java.io.*;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.HashMap;
 
 public class ExternalFile {
 
@@ -45,7 +48,7 @@ public class ExternalFile {
 
     public ExternalFileIterator(String root) {
         File rootDir = new File(root);
-        topLevelDirs = rootDir.listFiles();
+        topLevelDirs = rootDir.listFiles(File::isDirectory);
         fileLevelDirs = topLevelDirs[0].listFiles();
     }
 
@@ -70,7 +73,7 @@ public class ExternalFile {
             }
           }
           //Find the latest version of the file
-          File[] timeStamps = currentFile.listFiles();
+          File[] timeStamps = currentFile.listFiles(File::isDirectory);
           File timeDir = null;
           long time = -1;
           for (File timeStamp : timeStamps) {
@@ -82,6 +85,82 @@ public class ExternalFile {
               }
             } catch (Exception e) {
               //skip
+            }
+          }
+
+          // Deal with the incrementals
+          File[] incrementals = currentFile.listFiles(File::isFile);
+          if (timeDir != null && incrementals != null && incrementals.length > 0) {
+            Arrays.sort(incrementals);
+            //File name should be file-timestamp.inc
+            String lastInc = incrementals[incrementals.length-1].getName().split("\\.")[0].split("-")[1];
+            Map<String, String> imap = new HashMap<>();
+            BufferedReader in = null;
+            for (File incremental : incrementals) {
+              try {
+                in = new BufferedReader(new FileReader(incremental));
+                String line = null;
+                while ((line = in.readLine()) != null) {
+                  String[] pair = line.split(":", 1);
+                  imap.put(pair[0], pair[1]);
+                }
+              } catch (Exception fe) {
+                throw new RuntimeException(fe);
+              } finally {
+                try {
+                  in.close();
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }
+            }
+
+            if(imap.size() > 0) {
+              // Apply the updates
+              // Rewrite create the new timeDir
+              File incDir = new File(currentFile, lastInc);
+              incDir.mkdirs();
+              File newFile = new File(incDir, currentFile.getName()+"txt");
+
+              File[] targets = timeDir.listFiles();
+              File targetFile = null;
+              if (targets.length > 0) {
+                if (targets[0].getName().endsWith(".txt")) {
+                  targetFile = targets[0];
+                }
+              }
+
+              PrintWriter newOut = null;
+              BufferedReader targetIn = null;
+              try {
+                targetIn = new BufferedReader(new FileReader(targetFile));
+                newOut = new PrintWriter(new BufferedWriter(new FileWriter(newFile)));
+                String line = null;
+                while ((line = targetIn.readLine()) != null) {
+                  String pair[] = line.split(":");
+                  if(imap.containsKey(pair[0])) {
+                    newOut.println(pair[0]+":"+imap.get(pair[0]));
+                  } else {
+                    newOut.println(line);
+                  }
+                }
+                // Delete all the incrementals.
+                for (File ifile : incrementals) {
+                  ifile.delete();
+                }
+                // Reset the file pointer and time
+                timeDir = incDir;
+                time = Long.parseLong(timeDir.getName());
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              } finally {
+                try {
+                  targetIn.close();
+                  newOut.close();
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }
             }
           }
 
