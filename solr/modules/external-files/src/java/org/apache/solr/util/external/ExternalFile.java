@@ -111,6 +111,11 @@ public class ExternalFile {
             Map<String, String> imap = new HashMap<>();
             BufferedReader in = null;
             for (File incremental : incrementals) {
+
+              if(!incremental.getName().endsWith(".inc")) {
+                continue;
+              }
+
               long itime = Long.parseLong(parseIncTime(incremental.getName()));
 
               if(itime <= time) {
