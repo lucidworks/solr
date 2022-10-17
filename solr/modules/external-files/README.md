@@ -174,6 +174,36 @@ must be provided if documents are routed to shards with a specific route key. Ex
 each file into separate files for each shard. The ids do not need to be sorted as files will be sorted by 
 unique id by the ExternalFileUtil.
 
+#### Incremental updates
+
+The ExternalFileUtil supports incremental updates of external files. The incremental updates files are
+placed in the root of the FILE directory:
+
+EXTERNAL_FILES_ROOT / N_TOP_LEVEL_SUBDIRS / FILENAME
+
+The file name of the incremental files must be structured as follows:
+
+***
+filename-unixepoch.inc
+***
+
+The filename is the same name as its parent directory. The unix epoch time should be the
+creation time of the file and is used to order the incremental update files. 
+The extension of the files is ".inc". A different
+extension should be used while the file is being copied into the directory and renamed to ".inc" after the
+copy is completed.
+
+Below is an example path of an incremental file:
+
+$root/bucket1/foo_ef/1661540544007/foo_ef-1666023034.inc
+
+The ExternalFileUtil applies the incremental updates to the full external file in the 
+latest timestamped directory. The existing external file is not changed. Instead, 
+a new full external file is written to a new timestamp directory which incorporates the incremental updates.
+The new timestamp directory will be the same as the highest timestamp of the incremental files. Once the
+new external file is written the incremental files are deleted.
+
+The structure of the records in the incremental files is the same as the records in the full external files.
 
 ### Storage and Format of Processed External Files (Output)
 
