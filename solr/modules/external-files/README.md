@@ -183,9 +183,9 @@ EXTERNAL_FILES_ROOT / N_TOP_LEVEL_SUBDIRS / FILENAME
 
 The file name of the incremental files must be structured as follows:
 
-***
+```
 filename-unixepoch.inc
-***
+```
 
 The filename is the same name as its parent directory. The unix epoch time should be the
 creation time of the file and is used to order the incremental update files. 
