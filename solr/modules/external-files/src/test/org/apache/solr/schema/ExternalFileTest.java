@@ -119,14 +119,65 @@ public class ExternalFileTest extends SolrCloudTestCase {
       out.close();
     }
 
+    long incTime = System.currentTimeMillis()+1;
+    // Add an incremental file
+    File incrementalFile = new File(dataDir.getParentFile(), "test_ef-"+String.valueOf(incTime)+".inc");
+    int c = 0;
+    Map<String, Float> incrementalMap = new HashMap<>();
+    PrintWriter incWriter = null;
+    try {
+      incWriter = new PrintWriter(new FileWriter(incrementalFile));
+      for (Map.Entry<String, Float> pair : pairs.entrySet()) {
+        ++c;
+        String id = pair.getKey();
+        float f = rand.nextFloat();
+        incrementalMap.put(id, f);
+        incWriter.println(id+":"+f);
+        if (c == 3) {
+          break;
+        }
+      }
+    } finally {
+      incWriter.close();
+    }
+
+    // Create a second incremental file which overwrites one record in the first incremental
+    File incrementalFile2 = new File(dataDir.getParentFile(), "test_ef-"+String.valueOf(incTime+1)+".inc");
+    int c2 = 0;
+    Map<String, Float> incrementalMap2 = new HashMap<>();
+    PrintWriter incWriter2 = null;
+    try {
+      incWriter2 = new PrintWriter(new FileWriter(incrementalFile2));
+      for (Map.Entry<String, Float> pair : incrementalMap.entrySet()) {
+        ++c2;
+        String id = pair.getKey();
+        float f = rand.nextFloat();
+        incrementalMap2.put(id, f);
+        incWriter2.println(id+":"+f);
+        if (c2 == 1) {
+          break;
+        }
+      }
+    } finally {
+      incWriter2.close();
+    }
+
     // Process the raw file
     File outRoot = new File(cluster.getBaseDir().toFile(), "out");
+
+    //Assert the incremental files exists
+    assertTrue(incrementalFile.exists());
+    assertTrue(incrementalFile2.exists());
 
     // Set the EXTERNAL_ROOT_PATH_VAR needed for the load.
     System.setProperty(ExternalFileField2.EXTERNAL_ROOT_PATH_VAR, outRoot.getAbsolutePath());
 
     String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS};
     ExternalFileUtil.main(args);
+
+    //Assert that the incremental is cleaned up
+    assertTrue(!incrementalFile.exists());
+    assertTrue(!incrementalFile2.exists());
 
     SolrParams params = params("q", "*:*", "rows", "250", "fl", "id,test_f,field(test_ef)");
     SolrClient client = cluster.getSolrClient();
@@ -135,14 +186,33 @@ public class ExternalFileTest extends SolrCloudTestCase {
     SolrDocumentList documentList = response.getResults();
     assertEquals(documentList.getNumFound(), pairs.size());
 
-    for(int i=0; i < documentList.size(); i++) {
+    int icount = 0;
+    int i2count = 0;
+
+    for (int i = 0; i < documentList.size(); i++) {
+
       SolrDocument document = documentList.get(i);
       String id = (String)document.getFieldValue("id");
       float f1 = (float)document.getFieldValue("test_f");
       float f2 = (float)document.getFieldValue("field(test_ef)");
-      assertEquals(pairs.get(id), f1, 0);
-      assertEquals(f1, f2, 0.0);
+
+      if (incrementalMap2.containsKey(id)) {
+        assertEquals(incrementalMap2.get(id), f2, 0);
+        assertNotEquals(incrementalMap.get(id), incrementalMap2.get(id), 0.0);
+        assertNotEquals(f1, f2, 0.0);
+        ++i2count;
+      } else if (incrementalMap.containsKey(id)) {
+        assertEquals(incrementalMap.get(id), f2, 0);
+        assertNotEquals(f1, f2, 0.0);
+        ++icount;
+      } else {
+        assertEquals(pairs.get(id), f1, 0);
+        assertEquals(f1, f2, 0.0);
+      }
     }
+
+    assertEquals(i2count, 1);
+    assertEquals(icount, 2);
   }
 
   @Test

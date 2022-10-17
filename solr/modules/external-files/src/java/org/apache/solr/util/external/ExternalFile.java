@@ -103,6 +103,7 @@ public class ExternalFile {
 
           // Deal with the incrementals
           File[] incrementals = currentFile.listFiles(File::isFile);
+
           if (timeDir != null && incrementals != null && incrementals.length > 0) {
             sortIncrementals(incrementals);
             //File name should be file-timestamp.inc
@@ -121,7 +122,7 @@ public class ExternalFile {
                 in = new BufferedReader(new FileReader(incremental));
                 String line = null;
                 while ((line = in.readLine()) != null) {
-                  String[] pair = line.split(":", 1);
+                  String[] pair = line.split(":", 2);
                   imap.put(pair[0], pair[1]);
                 }
               } catch (Exception fe) {
