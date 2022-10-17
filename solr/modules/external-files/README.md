@@ -176,8 +176,8 @@ unique id by the ExternalFileUtil.
 
 #### Incremental updates
 
-The ExternalFileUtil supports incremental updates of external files. The incremental updates files are
-placed in the root of the FILE directory:
+The ExternalFileUtil supports incremental updates of external files. The incremental update files are
+placed in the root of the FILENAME directory:
 
 EXTERNAL_FILES_ROOT / N_TOP_LEVEL_SUBDIRS / FILENAME
 
