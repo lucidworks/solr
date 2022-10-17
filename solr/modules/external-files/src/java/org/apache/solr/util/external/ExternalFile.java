@@ -18,10 +18,7 @@
 package org.apache.solr.util.external;
 
 import java.io.*;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.*;
 
 public class ExternalFile {
 
@@ -37,6 +34,22 @@ public class ExternalFile {
 
   public static Iterator<ExternalFile> iterate(String root) {
     return new ExternalFileIterator(root);
+  }
+
+  public static class FileTimeComp implements Comparator<File> {
+    public int compare(File f1, File f2) {
+      long l1 = Long.parseLong(parseIncTime(f1.getName()));
+      long l2 = Long.parseLong(parseIncTime(f2.getName()));
+      return Long.compare(l1, l2);
+    }
+  }
+
+  public static String parseIncTime(String s) {
+    return s.split("\\.")[0].split("-")[1];
+  }
+
+  public static void sortIncrementals(File[] incremenantals) {
+    Arrays.sort(incremenantals, new FileTimeComp());
   }
 
   public static class ExternalFileIterator implements Iterator<ExternalFile> {
@@ -91,12 +104,19 @@ public class ExternalFile {
           // Deal with the incrementals
           File[] incrementals = currentFile.listFiles(File::isFile);
           if (timeDir != null && incrementals != null && incrementals.length > 0) {
-            Arrays.sort(incrementals);
+            sortIncrementals(incrementals);
             //File name should be file-timestamp.inc
-            String lastInc = incrementals[incrementals.length-1].getName().split("\\.")[0].split("-")[1];
+            String lastInc = parseIncTime(incrementals[incrementals.length-1].getName());
             Map<String, String> imap = new HashMap<>();
             BufferedReader in = null;
             for (File incremental : incrementals) {
+              long itime = Long.parseLong(parseIncTime(incremental.getName()));
+
+              if(itime <= time) {
+                // Skip incremental that have a timestamp less then or equal to the last full file.
+                continue;
+              }
+
               try {
                 in = new BufferedReader(new FileReader(incremental));
                 String line = null;
@@ -116,8 +136,7 @@ public class ExternalFile {
             }
 
             if(imap.size() > 0) {
-              // Apply the updates
-              // Rewrite create the new timeDir
+              // Create the new timeDir and write the new full external file with incrementals applied
               File incDir = new File(currentFile, lastInc);
               incDir.mkdirs();
               File newFile = new File(incDir, currentFile.getName()+".txt");
