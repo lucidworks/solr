@@ -190,8 +190,8 @@ The file name of the incremental files must be structured as follows:
 The filename is the same name as its parent directory. The unix epoch time should be the
 creation time of the file and is used to order the incremental update files. 
 The extension of the files is ".inc". A different
-extension should be used while the file is being copied into the directory and renamed to ".inc" after the
-copy is completed.
+extension should be used while the file is being copied into the directory. Once the copy is complete
+the file should be renamed with the ".inc" extension.
 
 Below is an example path of an incremental file:
 
@@ -199,11 +199,11 @@ $root/bucket1/foo_ef/foo_ef-1666023034.inc
 
 The ExternalFileUtil applies the incremental updates to the full external file in the 
 latest timestamped directory. The existing external file is not changed. Instead, 
-a new full external file is written to a new timestamp directory which incorporates the incremental updates.
-The new timestamp directory will be the same as the highest timestamp of the incremental files. Once the
+a new full external file is written to a new timestamp directory with the merged incremental updates.
+The new timestamp directory is taken from the highest timestamp of the incremental files. Once the
 new external file is written the incremental files are deleted.
 
-The structure of the records in the incremental files is the same as the records in the full external files.
+The structure of the records in the incremental files should be the same as the records in the full external files.
 
 ### Storage and Format of Processed External Files (Output)
 
