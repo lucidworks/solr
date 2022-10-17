@@ -178,6 +178,8 @@ public class ExternalFileTest extends SolrCloudTestCase {
     //Assert that the incremental is cleaned up
     assertTrue(!incrementalFile.exists());
     assertTrue(!incrementalFile2.exists());
+    //Assert the new full extract dir exists
+    assertTrue(new File(dataDir.getParentFile(), Long.toString(incTime+1)).exists());
 
     SolrParams params = params("q", "*:*", "rows", "250", "fl", "id,test_f,field(test_ef)");
     SolrClient client = cluster.getSolrClient();
