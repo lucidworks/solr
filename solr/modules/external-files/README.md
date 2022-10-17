@@ -195,7 +195,7 @@ copy is completed.
 
 Below is an example path of an incremental file:
 
-$root/bucket1/foo_ef/1661540544007/foo_ef-1666023034.inc
+$root/bucket1/foo_ef/foo_ef-1666023034.inc
 
 The ExternalFileUtil applies the incremental updates to the full external file in the 
 latest timestamped directory. The existing external file is not changed. Instead, 
