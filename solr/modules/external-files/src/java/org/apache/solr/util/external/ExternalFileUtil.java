@@ -51,20 +51,14 @@ public class ExternalFileUtil {
     String mainCollection = args[3];
 
     CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
-    RandomAccessFile raFile = null;
-    FileChannel fileChannel = null;
-    FileLock fileLock = null;
-    File lockFile = null;
-    boolean lockAcquired = false;
+
+    ProcessLock processLock = null;
     try {
       /*
       * Acquire the file lock
       */
-      lockFile = new File(inRoot, "lock");
-      raFile = new RandomAccessFile(lockFile, "rw");
-      fileChannel = raFile.getChannel();
-      fileLock = fileChannel.tryLock();
-      lockAcquired = true;
+      processLock = new ProcessLock(new File(inRoot, "lock"));
+      processLock.tryLock();
       solrClient.connect();
       Iterator<ExternalFile> iterator = iterate(inRoot);
       while (iterator.hasNext()) {
@@ -73,22 +67,48 @@ public class ExternalFileUtil {
       }
     } finally {
 
-      /*
-      * Release the file lock
-      */
-
-      if(lockAcquired) {
-        fileLock.release();
+      if(processLock.isLockAcquired()) {
+        try {
+          solrClient.close();
+        } catch (Exception e) {
+          // Sit on this for now.
+        }
       }
-
-      fileChannel.close();
-      raFile.close();
-
-      if(lockAcquired) {
-        lockFile.delete();
-        solrClient.close();
-      }
+      processLock.release();
     }
+  }
+
+  public static class ProcessLock {
+
+    private FileLock fileLock;
+    private final FileChannel fileChannel;
+    private final RandomAccessFile randomAccessFile;
+    private final File file;
+    private boolean lockAcquired;
+
+    public ProcessLock(File file) throws Exception {
+      this.file = file;
+      this.randomAccessFile = new RandomAccessFile(file, "rw");
+      this.fileChannel = randomAccessFile.getChannel();
+    }
+
+    public void tryLock() throws Exception {
+      this.fileLock = fileChannel.tryLock();
+      this.lockAcquired = true;
+    }
+
+    public void release() throws Exception {
+      if (lockAcquired) {
+        this.fileLock.release();
+      }
+      this.fileChannel.close();
+      this.randomAccessFile.close();
+    }
+
+    public boolean isLockAcquired() {
+      return lockAcquired;
+    }
+
   }
 
   public static int hashCode(byte[] bytes, int offset, int length) {

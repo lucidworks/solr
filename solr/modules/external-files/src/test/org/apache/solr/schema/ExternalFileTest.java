@@ -19,6 +19,7 @@ package org.apache.solr.schema;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
+import java.nio.channels.OverlappingFileLockException;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Random;
@@ -105,6 +106,23 @@ public class ExternalFileTest extends SolrCloudTestCase {
 
     //Construct the expected raw directories
     File rawDirRoot = new File(cluster.getBaseDir().toFile(), "raw");
+    rawDirRoot.mkdirs();
+    ExternalFileUtil.ProcessLock processLock = null;
+
+    boolean lockWorked = false;
+    try {
+      processLock = new ExternalFileUtil.ProcessLock(new File(rawDirRoot, "lock"));
+      processLock.tryLock();
+      String[] args = {rawDirRoot.getAbsolutePath(), "", zkHost, COLLECTIONORALIAS};
+      ExternalFileUtil.main(args);
+    } catch (OverlappingFileLockException oe) {
+      lockWorked = true;
+    } finally {
+      processLock.release();
+    }
+
+    assertTrue(lockWorked);
+
     File dataDir = new File(new File(new File(rawDirRoot, "bucket1"), "test_ef"), String.valueOf(System.currentTimeMillis()));
     dataDir.mkdirs();
     File dataFile = new File(dataDir, "test_ef.txt");
