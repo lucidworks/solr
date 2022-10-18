@@ -4,6 +4,10 @@ This file lists Solr's raw release notes with details of every change to Solr.
 Most people will find the solr-upgrade-notes.adoc file more approachable.
 https://github.com/apache/solr/blob/main/solr/solr-ref-guide/modules/upgrade-notes/pages/solr-upgrade-notes.adoc
 
+================== Lucidworks Patches ==================
+
+* FUS-2043: Switch docker image to use eclipse-temurin:11-jre as base image  (see SOLR-16463)
+
 ==================  9.0.0 ==================
 
 New Features
