@@ -208,3 +208,11 @@ apply from: file('gradle/ant-compat/solr.post-jar.gradle')
 
 apply from: file('gradle/node.gradle')
 
+// disble all java tests to speed up docker build (we're only modifying docker)
+allprojects {
+  plugins.withType(JavaPlugin) {
+    project.tasks.withType(Test) {
+      it.enabled = false;
+    }
+  }
+}
