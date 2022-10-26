@@ -54,7 +54,6 @@ public class ExternalFileUtil {
     ExecutorService executor = Executors.newFixedThreadPool(threads);
     CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
 
-
     ProcessLock processLock = null;
     try {
       /*
@@ -69,8 +68,8 @@ public class ExternalFileUtil {
       while (iterator.hasNext()) {
         ExternalFile externalFile = iterator.next();
         batch.add(externalFile);
-        if(batch.size() == 8) {
-          // Process 8 files at a time in parallel.
+        if(batch.size() == threads) {
+          // Process a batch in parallel
           // Each file has its own output directory so threads won't conflict
           List<Future<Boolean>> futures = new ArrayList<>();
           for(ExternalFile f : batch) {
