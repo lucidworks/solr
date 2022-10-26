@@ -113,7 +113,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
     try {
       processLock = new ExternalFileUtil.ProcessLock(new File(rawDirRoot, "lock"));
       processLock.tryLock();
-      String[] args = {rawDirRoot.getAbsolutePath(), "", zkHost, COLLECTIONORALIAS};
+      String[] args = {rawDirRoot.getAbsolutePath(), "", zkHost, COLLECTIONORALIAS, "8"};
       ExternalFileUtil.main(args);
     } catch (OverlappingFileLockException oe) {
       lockWorked = true;
@@ -190,7 +190,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
     // Set the EXTERNAL_ROOT_PATH_VAR needed for the load.
     System.setProperty(ExternalFileField2.EXTERNAL_ROOT_PATH_VAR, outRoot.getAbsolutePath());
 
-    String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS};
+    String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS, "8"};
     ExternalFileUtil.main(args);
 
     //Assert that the incremental is cleaned up
@@ -284,7 +284,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
     // Set the EXTERNAL_ROOT_PATH_VAR needed for the load.
     System.setProperty(ExternalFileField2.EXTERNAL_ROOT_PATH_VAR, outRoot.getAbsolutePath());
 
-    String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS};
+    String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS, "8"};
     ExternalFileUtil.main(args);
 
     SolrParams params = params("q", "*:*", "rows", "500", "fl", "id,test_f,field(test_ef)");
@@ -353,7 +353,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
     // Set the EXTERNAL_ROOT_PATH_VAR needed for the load.
     System.setProperty(ExternalFileField2.EXTERNAL_ROOT_PATH_VAR, outRoot.getAbsolutePath());
 
-    String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS};
+    String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS, "8"};
     ExternalFileUtil.main(args);
 
     SolrParams params = params("q", "*:*", "rows", "500", "fl", "id,test_f,field(test_ef)");
@@ -434,7 +434,7 @@ public class ExternalFileTest extends SolrCloudTestCase {
     // Set the EXTERNAL_ROOT_PATH_VAR needed for the load.
     System.setProperty(ExternalFileField2.EXTERNAL_ROOT_PATH_VAR, outRoot.getAbsolutePath());
 
-    String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS};
+    String[] args = {rawDirRoot.getAbsolutePath(), outRoot.getAbsolutePath(), zkHost, COLLECTIONORALIAS, "8"};
     ExternalFileUtil.main(args);
 
     SolrParams params = params("q", "*:*", "rows", "500", "fl", "id,test_f,field(test_ef)");

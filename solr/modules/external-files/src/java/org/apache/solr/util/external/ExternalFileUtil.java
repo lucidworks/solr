@@ -50,7 +50,8 @@ public class ExternalFileUtil {
     List<String> zkHosts = new ArrayList<>();
     zkHosts.add(zkHost);
     String mainCollection = args[3];
-    ExecutorService executor = Executors.newFixedThreadPool(8);
+    int threads = Integer.parseInt(args[4]);
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
     CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
 
 
