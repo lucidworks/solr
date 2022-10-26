@@ -28,6 +28,7 @@ import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class ExternalFileUtil {
 
@@ -49,8 +50,9 @@ public class ExternalFileUtil {
     List<String> zkHosts = new ArrayList<>();
     zkHosts.add(zkHost);
     String mainCollection = args[3];
-
+    ExecutorService executor = Executors.newFixedThreadPool(8);
     CloudSolrClient solrClient = new CloudLegacySolrClient.Builder(zkHosts, Optional.empty()).build();
+
 
     ProcessLock processLock = null;
     try {
@@ -61,9 +63,43 @@ public class ExternalFileUtil {
       processLock.tryLock();
       solrClient.connect();
       Iterator<ExternalFile> iterator = iterate(inRoot);
+      List<ExternalFile> batch = new ArrayList<>();
+      Exception caught = null;
       while (iterator.hasNext()) {
         ExternalFile externalFile = iterator.next();
-        process(externalFile, outRoot, solrClient, mainCollection);
+        batch.add(externalFile);
+        if(batch.size() == 8) {
+          // Process 8 files at a time in parallel.
+          // Each file has its own output directory so threads won't conflict
+          List<Future<Boolean>> futures = new ArrayList<>();
+          for(ExternalFile f : batch) {
+            Future<Boolean>  future = executor.submit(new FileProcessor(f, outRoot, solrClient, mainCollection));
+            futures.add(future);
+          }
+
+          for(Future<Boolean> future : futures) {
+            // If an exception gets thrown here the process will exit
+            try {
+              future.get();
+            } catch (Exception e) {
+              caught = e;
+            }
+          }
+
+          batch.clear();
+        }
+
+        //Any exceptions in the batch?
+        if(caught != null) {
+          throw caught;
+        }
+      }
+
+      // Process last unfinished batch serially
+      if(batch.size() > 0) {
+        for(ExternalFile f : batch) {
+          process(f, outRoot, solrClient, mainCollection);
+        }
       }
     } finally {
 
@@ -75,6 +111,26 @@ public class ExternalFileUtil {
         }
       }
       processLock.release();
+    }
+  }
+
+  public static class FileProcessor implements Callable<Boolean> {
+
+    private final ExternalFile externalFile;
+    private final String outRoot;
+    private final CloudSolrClient solrClient;
+    private final String mainCollection;
+
+    public FileProcessor(ExternalFile externalFile, String outRoot, CloudSolrClient solrClient, String mainCollection) {
+      this.externalFile = externalFile;
+      this.outRoot = outRoot;
+      this.solrClient = solrClient;
+      this.mainCollection = mainCollection;
+    }
+
+    public Boolean call() throws Exception {
+      ExternalFileUtil.process(externalFile, outRoot, solrClient, mainCollection);
+      return true;
     }
   }
 
