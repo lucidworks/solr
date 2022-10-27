@@ -56,7 +56,7 @@ cd $SOLR_DISTRIBUTION_ROOT
 # cd to the external files module
 cd solr/modules/external-files
 # Run the script
-./split.sh $raw_root $out_root $zhHost $collection
+./split.sh $raw_root $out_root $zhHost $collection $num_threads
 ```
 
 NOTE: This will eventually be simplified when the external-file module is shipped with the binary distribution of Solr.
@@ -64,6 +64,8 @@ NOTE: This will eventually be simplified when the external-file module is shippe
 The EFU will walk the raw files root dir looking for newly added external files. It compares timestamp directories for each
 file to determine if a new version of a file is available. It will process all new files and emit partitioned, binary files
 to the output directory. The format of the input and output are described in sections below.
+
+The `$num_threads` parameter sets the number threads used to process the files.
 
 Note that the EFU connects to a running Solr instance to access the DocRouter used by a specific collection. The EFU does not send any data
 to Solr, it only splits the data into files that match up with the shards for a specific Solr collection. But the EFU must have access to the
