@@ -18,7 +18,7 @@
 # From root of Solr repo:
 #   ./gradlew -p solr/packaging assemble
 #   cd solr/modules/external-files
-#   ./split.sh $raw_root $out_root $zhHost $collection
+#   ./split.sh $raw_root $out_root $zhHost $collection $num_threads
 ####
 
-java -cp ./build/libs/*:../../server/build/packaging/solr-webapp/webapp/WEB-INF/lib/*:../../server/build/packaging/server/lib/*:../../server/build/packaging/lib/ext/* org.apache.solr.util.external.ExternalFileUtil $1 $2 $3 $4
+java -cp ./build/libs/*:../../server/build/packaging/solr-webapp/webapp/WEB-INF/lib/*:../../server/build/packaging/server/lib/*:../../server/build/packaging/lib/ext/* org.apache.solr.util.external.ExternalFileUtil $1 $2 $3 $4 $5
