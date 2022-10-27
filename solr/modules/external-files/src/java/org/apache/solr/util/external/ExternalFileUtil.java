@@ -23,6 +23,7 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.util.Hash;
+import org.apache.solr.util.CLIO;
 
 import java.io.*;
 import java.nio.channels.FileChannel;
@@ -43,6 +44,15 @@ public class ExternalFileUtil {
   private static final int SORT_PARTITION_SIZE = 50000;
 
   public static void main(String[] args) throws Exception {
+
+    if(args.length != 5) {
+      CLIO.out("ExternalFileUtil requires 5 parameters:");
+      CLIO.out("- inRoot");
+      CLIO.out("- outRoot");
+      CLIO.out("- zkHost");
+      CLIO.out("- mainCollection");
+      CLIO.out("- numThreads");
+    }
 
     String inRoot = args[0];
     String outRoot = args[1];
